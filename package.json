@@ -14,8 +14,10 @@
         "vite": "^6.0.11"
     },
     "dependencies": {
+        "@heroicons/react": "^2.2.0",
         "bootstrap": "^5.3.8",
         "bootstrap-icons": "^1.13.1",
-        "chart.js": "^4.5.1"
+        "chart.js": "^4.5.1",
+        "lucide": "^1.23.0"
     }
 }
