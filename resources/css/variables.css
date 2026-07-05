@@ -1,0 +1,50 @@
+/* =========================================
+   PERTAMINA DESIGN SYSTEM
+========================================= */
+
+:root{
+
+    /* Brand Color */
+
+    --primary:#0F62FE;
+    --secondary:#5E6C84;
+
+    --pertamina-blue:#2856A3;
+    --pertamina-green:#A7C636;
+    --pertamina-red:#E31E24;
+    --pertamina-black:#222222;
+
+    /* Status */
+
+    --success:#5CB85C;
+    --warning:#F0AD4E;
+    --danger:#D9534F;
+    --info:#5BC0DE;
+
+    /* Background */
+
+    --background:#F5F7FA;
+    --surface:#FFFFFF;
+
+    /* Text */
+
+    --text-primary:#2E3A59;
+    --text-secondary:#6B7280;
+    --text-muted:#9CA3AF;
+
+    /* Border */
+
+    --border:#E5E7EB;
+
+    /* Shadow */
+
+    --shadow-sm:0 2px 8px rgba(0,0,0,.04);
+    --shadow-md:0 8px 24px rgba(0,0,0,.08);
+
+    /* Radius */
+
+    --radius-sm:8px;
+    --radius-md:12px;
+    --radius-lg:18px;
+
+}
