@@ -1,0 +1,23 @@
+.sidebar{
+
+    width:260px;
+
+    background:white;
+
+    border-right:1px solid var(--border);
+
+    min-height:100vh;
+
+}
+
+.logo{
+
+    padding:24px;
+
+}
+
+.logo img{
+
+    width:170px;
+
+}

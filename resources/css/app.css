@@ -1,21 +1,26 @@
+@import "tailwindcss";
+
+/* Base */
 @import "./variables.css";
 @import "./typography.css";
 @import "./utilities.css";
+@import "./animations.css";
+
+/* Layout */
+@import "./layouts/layout.css";
+@import "./layouts/navbar.css";
+@import "./layouts/sidebar.css";
+@import "./layouts/footer.css";
 
 /* Components */
-@import "./components/card.css";
 @import "./components/button.css";
-@import "./components/badge.css";
+@import "./components/card.css";
 @import "./components/table.css";
+@import "./components/badge.css";
 @import "./components/alert.css";
-
-/* Layouts */
-@import "./layouts/layout.css";
-@import "./layouts/sidebar.css";
-@import "./layouts/navbar.css";
-@import "./layouts/footer.css";
 
 /* Pages */
 @import "./pages/dashboard.css";
 @import "./pages/login.css";
 @import "./pages/monitoring.css";
+@import "./pages/users.css";

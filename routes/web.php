@@ -2,69 +2,28 @@
 
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/', function () {
-    return redirect('/login');
-});
+use App\Http\Controllers\SipekaImportController;
+use App\Http\Controllers\SipekaFindingController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardFunctionController;
 
 Route::view('/login', 'auth.login')->name('login');
+Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-
-/*
-|--------------------------------------------------------------------------
-| Dashboard
-|--------------------------------------------------------------------------
-*/
-
-Route::view('/dashboard', 'dashboard.index')->name('dashboard');
-
-Route::view('/dashboard/operation', 'dashboard.operation');
-
-Route::view('/dashboard/maintenance', 'dashboard.maintenance');
-
-Route::view('/dashboard/hsse', 'dashboard.hsse');
-
-Route::view('/dashboard/business-support', 'dashboard.business-support');
-
-
-/*
-|--------------------------------------------------------------------------
-| Monitoring
-|--------------------------------------------------------------------------
-*/
-
-Route::view('/monitoring', 'monitoring.index');
-
-Route::view('/monitoring/detail', 'monitoring.detail');
-
-
-/*
-|--------------------------------------------------------------------------
-| User Management
-|--------------------------------------------------------------------------
-*/
-
-Route::view('/users', 'management.users');
-
-
-/*
-|--------------------------------------------------------------------------
-| Import Excel
-|--------------------------------------------------------------------------
-*/
-
-Route::view('/import', 'import.index');
-
-
-/*
-|--------------------------------------------------------------------------
-| Report
-|--------------------------------------------------------------------------
-*/
-
-Route::view('/report', 'report.index');
+Route::middleware('auth')->group(function () {
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/fungsi/{nama_fungsi?}', [DashboardFunctionController::class, 'index'])->name('dashboard.fungsi');
+    
+    Route::get('/findings', [SipekaFindingController::class, 'index'])->name('findings.index');
+    Route::post('/findings/{id}/update', [SipekaFindingController::class, 'update'])->name('findings.update');
+    Route::get('/findings/{id}', [SipekaFindingController::class, 'show'])->name('findings.show');
+    
+    // Admin HSSE only
+    Route::middleware('role:Admin HSSE')->group(function () {
+        Route::post('/sipeka/upload', [SipekaImportController::class, 'upload'])->name('sipeka.upload');
+        Route::resource('users', UserController::class)->except(['show']);
+    });
+});
