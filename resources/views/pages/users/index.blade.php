@@ -24,12 +24,10 @@
     @endif
 
     @php
-        // Filter users that are "Admin Function"
-        $adminFunctions = $users->where('role', 'Admin Function');
-        
-        // Group by 'fungsi'
-        $fungsiCount = $adminFunctions->groupBy('fungsi')->map->count();
-        $fungsiUsers = $adminFunctions->groupBy('fungsi')->map->take(4);
+        // Group by 'fungsi' for all valid functions
+        $fungsiGrouped = $allUsers->whereNotNull('fungsi')->where('fungsi', '!=', '')->groupBy('fungsi');
+        $fungsiCount = $fungsiGrouped->map->count();
+        $fungsiUsers = $fungsiGrouped->map->take(4);
         
         $rolesData = [
             'Admin HSSE' => ['icon' => '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>', 'color' => 'text-red-500'],
@@ -54,13 +52,13 @@
                                 $ini = strtoupper(substr($u->name, 0, 1));
                                 $clr = $avatarColors[crc32($u->username) % count($avatarColors)];
                             @endphp
-                            <div class="inline-block h-8 w-8 rounded-full ring-2 ring-white {{ $clr }} flex items-center justify-center text-xs font-bold">{{ $ini }}</div>
+                            <div class="inline-flex h-8 w-8 rounded-full ring-2 ring-white {{ $clr }} items-center justify-center text-xs font-bold">{{ $ini }}</div>
                         @endforeach
                     @endif
                 </div>
             </div>
             <h3 class="text-lg font-semibold text-slate-800 mb-1">Admin {{ $fName }}</h3>
-            <a href="#" class="text-blue-600 text-sm hover:underline">Lihat Admin</a>
+            <a href="{{ route('users.index', ['fungsi' => $fName]) }}" class="text-blue-600 text-sm hover:underline">Lihat Admin</a>
         </div>
         @endforeach
     </div>
@@ -72,17 +70,34 @@
 
     <!-- Filters & Actions -->
     <div class="bg-white rounded-t-2xl border border-slate-200 border-b-0 p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <button class="inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-200 transition-all shadow-sm">
-            <svg class="w-4 h-4 mr-2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-            EXPORT
-        </button>
-        <div class="flex items-center gap-3 w-full sm:w-auto">
-            <div class="relative w-full sm:w-64">
+        
+        <!-- Left Side: Active Filter Indicator -->
+        <div class="flex items-center w-full sm:w-auto">
+            @if(request('fungsi'))
+                <div class="flex items-center gap-3 bg-blue-50 border border-blue-100 px-3 py-2 rounded-lg">
+                    <span class="text-sm text-slate-600">
+                        Filter aktif: <span class="font-bold text-blue-700">{{ request('fungsi') }}</span>
+                    </span>
+                    <div class="w-px h-4 bg-blue-200"></div>
+                    <a href="{{ route('users.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        Tampilkan Semua
+                    </a>
+                </div>
+            @endif
+        </div>
+
+        <!-- Right Side: Search and Add -->
+        <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+            <form action="{{ route('users.index') }}" method="GET" class="relative w-full sm:w-64">
                 <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 </div>
-                <input type="text" class="block w-full p-2.5 pl-10 text-sm text-slate-900 border border-slate-300 rounded-lg bg-slate-50 focus:ring-blue-500 focus:border-blue-500" placeholder="Search User">
-            </div>
+                <input type="text" name="search" value="{{ request('search') }}" class="block w-full p-2.5 pl-10 text-sm text-slate-900 border border-slate-300 rounded-lg bg-slate-50 focus:ring-blue-500 focus:border-blue-500" placeholder="Search User">
+                @if(request('fungsi'))
+                    <input type="hidden" name="fungsi" value="{{ request('fungsi') }}">
+                @endif
+            </form>
             <button onclick="document.getElementById('modal-create').classList.remove('hidden')" class="inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap">
                 ADD USER
             </button>
@@ -95,9 +110,7 @@
             <table class="w-full text-sm text-left text-slate-600">
                 <thead class="text-xs text-slate-400 uppercase bg-white border-b border-slate-200">
                     <tr>
-                        <th class="px-6 py-4 font-semibold w-10">
-                            <input type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        </th>
+
                         <th class="px-6 py-4 font-semibold tracking-wider">User</th>
                         <th class="px-6 py-4 font-semibold tracking-wider">Username</th>
                         <th class="px-6 py-4 font-semibold tracking-wider">Role</th>
@@ -109,9 +122,7 @@
                 <tbody class="divide-y divide-slate-100">
                     @foreach($users as $user)
                     <tr class="hover:bg-slate-50/70 transition-colors group">
-                        <td class="px-6 py-4">
-                            <input type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        </td>
+
                         <td class="px-6 py-4 flex items-center gap-3">
                             @php 
                                 $initial = strtoupper(substr($user->name, 0, 1));
@@ -122,7 +133,7 @@
                             </div>
                             <div>
                                 <p class="font-semibold text-slate-800">{{ $user->name }}</p>
-                                <p class="text-xs text-slate-400">@{{ $user->username }}</p>
+                                <p class="text-xs text-slate-400">{{ $user->username }}</p>
                             </div>
                         </td>
                         <td class="px-6 py-4 text-slate-500">{{ $user->username }}</td>
@@ -202,19 +213,24 @@
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>
-                    <input type="text" name="name" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <input type="text" name="name" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
-                    <input type="text" name="username" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <input type="text" name="username" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                    <input type="password" name="password" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <div class="relative">
+                        <input type="password" name="password" id="create-password" required class="w-full pl-4 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
+                        <button type="button" onclick="togglePassword('create-password', this)" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                    <select name="role" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <select name="role" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
                         <option value="Admin HSSE">Admin HSSE</option>
                         <option value="Admin Function">Admin Function</option>
                         <option value="Manager HSSE">Manager HSSE</option>
@@ -223,7 +239,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Fungsi</label>
-                    <select name="fungsi" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <select name="fungsi" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
                         <option value="Operation">Operation</option>
                         <option value="Maintenance">Maintenance</option>
                         <option value="HSSE">HSSE</option>
@@ -231,8 +247,8 @@
                     </select>
                 </div>
                 <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" onclick="document.getElementById('modal-create').classList.add('hidden')" class="px-4 py-2.5 text-sm font-medium text-slate-500 bg-white border border-slate-300 hover:bg-slate-50 hover:text-slate-700 rounded-lg transition-colors">CANCEL</button>
-                    <button type="submit" class="px-4 py-2.5 text-sm font-medium text-white bg-[#9DBF2A] hover:bg-[#8ca825] rounded-lg transition-colors shadow-sm uppercase tracking-wide">SAVE</button>
+                    <button type="button" onclick="document.getElementById('modal-create').classList.add('hidden')" class="px-5 py-2.5 text-sm font-medium text-slate-500 bg-white border border-slate-300 hover:bg-slate-50 hover:text-slate-700 rounded-xl transition-colors">CANCEL</button>
+                    <button type="submit" class="px-5 py-2.5 text-sm font-medium text-white bg-[#9DBF2A] hover:bg-[#8ca825] rounded-xl transition-colors shadow-sm uppercase tracking-wide">SAVE</button>
                 </div>
             </form>
         </div>
@@ -254,19 +270,24 @@
                 @method('PUT')
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>
-                    <input type="text" name="name" id="edit-name" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <input type="text" name="name" id="edit-name" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
-                    <input type="text" name="username" id="edit-username" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <input type="text" name="username" id="edit-username" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Reset Password <span class="text-xs text-slate-400 font-normal">(Kosongkan jika tidak ingin mengubah)</span></label>
-                    <input type="password" name="password" class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <div class="relative">
+                        <input type="password" name="password" id="edit-password" class="w-full pl-4 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
+                        <button type="button" onclick="togglePassword('edit-password', this)" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                    <select name="role" id="edit-role" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <select name="role" id="edit-role" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
                         <option value="Admin HSSE">Admin HSSE</option>
                         <option value="Admin Function">Admin Function</option>
                         <option value="Manager HSSE">Manager HSSE</option>
@@ -275,7 +296,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Fungsi</label>
-                    <select name="fungsi" id="edit-fungsi" required class="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <select name="fungsi" id="edit-fungsi" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl shadow-sm focus:bg-white focus:border-[#9DBF2A] focus:ring-4 focus:ring-[#9DBF2A]/20 transition-all duration-200 text-slate-700">
                         <option value="Operation">Operation</option>
                         <option value="Maintenance">Maintenance</option>
                         <option value="HSSE">HSSE</option>
@@ -283,8 +304,8 @@
                     </select>
                 </div>
                 <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" onclick="document.getElementById('modal-edit').classList.add('hidden')" class="px-4 py-2.5 text-sm font-medium text-slate-500 bg-white border border-slate-300 hover:bg-slate-50 hover:text-slate-700 rounded-lg transition-colors">CANCEL</button>
-                    <button type="submit" class="px-4 py-2.5 text-sm font-medium text-white bg-[#9DBF2A] hover:bg-[#8ca825] rounded-lg transition-colors shadow-sm uppercase tracking-wide">UPDATE</button>
+                    <button type="button" onclick="document.getElementById('modal-edit').classList.add('hidden')" class="px-5 py-2.5 text-sm font-medium text-slate-500 bg-white border border-slate-300 hover:bg-slate-50 hover:text-slate-700 rounded-xl transition-colors">CANCEL</button>
+                    <button type="submit" class="px-5 py-2.5 text-sm font-medium text-white bg-[#9DBF2A] hover:bg-[#8ca825] rounded-xl transition-colors shadow-sm uppercase tracking-wide">UPDATE</button>
                 </div>
             </form>
         </div>
@@ -292,6 +313,16 @@
 </div>
 
 <script>
+    function togglePassword(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>';
+        } else {
+            input.type = 'password';
+            btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
+        }
+    }
     function openEditModal(user) {
         document.getElementById('edit-name').value = user.name;
         document.getElementById('edit-username').value = user.username;

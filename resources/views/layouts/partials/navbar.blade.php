@@ -21,10 +21,7 @@
         <!-- Right Side: Icons & Profile -->
         <div class="flex items-center space-x-3 sm:space-x-4">
             
-            <!-- Translate Icon -->
-            <button class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-full transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path></svg>
-            </button>
+
 
             <!-- Theme Toggle (Moon) -->
             <button class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-full transition-colors">
@@ -43,7 +40,7 @@
             <!-- User Profile Avatar -->
             <button class="flex items-center focus:outline-none">
                 <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-200 shadow-sm">
-                    <img src="https://ui-avatars.com/api/?name=Admin+User&background=3b5998&color=fff" alt="User Avatar" class="w-full h-full object-cover">
+                    <img src="https://ui-avatars.com/api/?name={{ urlencode(auth()->user()->name ?? 'User') }}&background=3b5998&color=fff" alt="User Avatar" class="w-full h-full object-cover">
                 </div>
             </button>
         </div>

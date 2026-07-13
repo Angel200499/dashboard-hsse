@@ -11,27 +11,46 @@
             <p class="text-sm text-slate-500 mt-1">Data temuan lapangan, update No. SAP, dan Keterangan Tindak Lanjut.</p>
         </div>
         
-        <div class="flex items-center gap-3">
-            <!-- Search Box -->
-            <div class="relative">
-                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <div class="flex items-center gap-3">
+            <form action="" method="GET" class="flex flex-wrap items-center gap-3">
+                <div class="relative w-full sm:w-auto">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="text" name="search" value="{{ request('search') }}" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block w-full pl-10 p-2.5 shadow-sm" placeholder="Cari area, temuan...">
                 </div>
-                <input type="text" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block w-full pl-10 p-2.5 shadow-sm" placeholder="Cari area, temuan...">
-            </div>
-            
-            <button class="inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9DBF2A] transition-all shadow-sm">
-                <svg class="w-4 h-4 mr-2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
-                Filter
-            </button>
+
+                <select name="status_filter" onchange="this.form.submit()" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm min-w-[120px]">
+                    <option value="">Semua Status</option>
+                    <option value="open" {{ request("status_filter") == "open" ? "selected" : "" }}>Open</option>
+                    <option value="in progress" {{ request("status_filter") == "in progress" ? "selected" : "" }}>In Progress</option>
+                    <option value="closed" {{ request("status_filter") == "closed" ? "selected" : "" }}>Closed</option>
+                </select>
+
+                <select name="date_filter" onchange="this.form.submit()" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm min-w-[120px]">
+                    <option value="">Semua Waktu</option>
+                    <option value="1_day" {{ request("date_filter") == "1_day" ? "selected" : "" }}>1 Hari Terakhir</option>
+                    <option value="3_days" {{ request("date_filter") == "3_days" ? "selected" : "" }}>3 Hari Terakhir</option>
+                    <option value="1_week" {{ request("date_filter") == "1_week" ? "selected" : "" }}>1 Minggu Terakhir</option>
+                    <option value="1_month" {{ request("date_filter") == "1_month" ? "selected" : "" }}>1 Bulan Terakhir</option>
+                </select>
+            </form>
         </div>
     </div>
 
     <!-- Data Table Card -->
     <div class="bg-white border border-slate-200 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto overflow-y-auto max-h-[600px] relative">
             <table class="w-full text-sm text-left text-slate-500 whitespace-nowrap">
-                <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200">
+                <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+                    @php
+                        function sortUrl($column) {
+                            $currentSortBy = request('sort_by');
+                            $currentSortDir = request('sort_dir', 'asc');
+                            $newDir = ($currentSortBy === $column && $currentSortDir === 'asc') ? 'desc' : 'asc';
+                            return request()->fullUrlWithQuery(['sort_by' => $column, 'sort_dir' => $newDir]);
+                        }
+                    @endphp
                     <tr>
                         <th scope="col" class="px-6 py-4 font-semibold">No</th>
                         <th scope="col" class="px-6 py-4 font-semibold">ID Temuan</th>
@@ -42,12 +61,52 @@
                         <th scope="col" class="px-6 py-4 font-semibold">Kategori</th>
                         <th scope="col" class="px-6 py-4 font-semibold">Unsafe Action</th>
                         <th scope="col" class="px-6 py-4 font-semibold">Unsafe Condition</th>
-                        <th scope="col" class="px-6 py-4 font-semibold">Status</th>
+                        <th scope="col" class="px-6 py-4 font-semibold">
+                            <a href="{{ sortUrl('status') }}" class="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                                Status
+                                @if(request('sort_by') === 'status')
+                                    @if(request('sort_dir') === 'desc')
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    @else
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+                                    @endif
+                                @else
+                                    <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>
+                                @endif
+                            </a>
+                        </th>
                         <th scope="col" class="px-6 py-4 font-semibold">Assign</th>
                         <th scope="col" class="px-6 py-4 font-semibold">Asset Owner</th>
                         <th scope="col" class="px-6 py-4 font-semibold">Assign Date</th>
                         <th scope="col" class="px-6 py-4 font-semibold">Target</th>
-                        <th scope="col" class="px-6 py-4 font-semibold text-blue-700 bg-blue-50">No. SAP</th>
+                        <th scope="col" class="px-6 py-4 font-semibold text-blue-700 bg-blue-50">
+                            <a href="{{ sortUrl('no_sap') }}" class="flex items-center gap-1 hover:text-blue-900 transition-colors">
+                                No. SAP
+                                @if(request('sort_by') === 'no_sap')
+                                    @if(request('sort_dir') === 'desc')
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    @else
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+                                    @endif
+                                @else
+                                    <svg class="w-3 h-3 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>
+                                @endif
+                            </a>
+                        </th>
+                        <th scope="col" class="px-6 py-4 font-semibold text-blue-700 bg-blue-50 min-w-[200px]">
+                            <a href="{{ sortUrl('keterangan') }}" class="flex items-center gap-1 hover:text-blue-900 transition-colors">
+                                Keterangan Tindak Lanjut
+                                @if(request('sort_by') === 'keterangan')
+                                    @if(request('sort_dir') === 'desc')
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    @else
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+                                    @endif
+                                @else
+                                    <svg class="w-3 h-3 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>
+                                @endif
+                            </a>
+                        </th>
                         <th scope="col" class="px-6 py-4 font-semibold">Close By</th>
                         <th scope="col" class="px-6 py-4 font-semibold">Close Fungsi</th>
                         <th scope="col" class="px-6 py-4 font-semibold">Verify By</th>
@@ -55,8 +114,7 @@
                         <th scope="col" class="px-6 py-4 font-semibold">Foto Temuan</th>
                         <th scope="col" class="px-6 py-4 font-semibold">Foto Close</th>
                         <th scope="col" class="px-6 py-4 font-semibold">User Status</th>
-                        <th scope="col" class="px-6 py-4 font-semibold text-blue-700 bg-blue-50 min-w-[200px]">Tindak Lanjut</th>
-                        <th scope="col" class="px-6 py-4 font-semibold text-right sticky right-0 bg-slate-50">Aksi</th>
+                                                <th scope="col" class="px-6 py-4 font-semibold text-right sticky right-0 bg-slate-50">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -65,7 +123,7 @@
                             $data = $finding->data_sipeka ?? [];
                         @endphp
                         <tr class="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                            <td class="px-6 py-4">{{ $findings->firstItem() + $index }}</td>
+                            <td class="px-6 py-4">{{ $index + 1 }}</td>
                             <td class="px-6 py-4 font-medium text-slate-900">{{ $finding->id_temuan }}</td>
                             <td class="px-6 py-4">{{ $data['tanggal'] ?? '-' }}</td>
                             <td class="px-6 py-4 whitespace-normal min-w-[250px]">{{ $data['temuan'] ?? '-' }}</td>
@@ -75,11 +133,18 @@
                             <td class="px-6 py-4">{{ $data['unsafe_action'] ?? '-' }}</td>
                             <td class="px-6 py-4">{{ $data['unsafe_conditon'] ?? '-' }}</td>
                             <td class="px-6 py-4">
-                                @php $status = strtolower($data['status'] ?? ''); @endphp
-                                @if($status === 'open')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Open</span>
-                                @elseif($status === 'closed')
+                                @php 
+                                    $status = strtolower($data['status'] ?? ''); 
+                                    $hasSap = !empty($finding->no_notifikasi_sap);
+                                    $hasKeterangan = !empty($finding->keterangan_tindak_lanjut);
+                                    $isInProgress = $status === 'open' && $hasSap && $hasKeterangan;
+                                @endphp
+                                @if($status === 'closed')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Closed</span>
+                                @elseif($isInProgress)
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">In Progress</span>
+                                @elseif($status === 'open')
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Open</span>
                                 @else
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{{ $data['status'] ?? '-' }}</span>
                                 @endif
@@ -90,6 +155,9 @@
                             <td class="px-6 py-4">{{ $data['target'] ?? '-' }}</td>
                             <td class="px-6 py-4 font-mono font-bold text-blue-700 bg-blue-50/50">
                                 {{ $finding->no_notifikasi_sap ?? '-' }}
+                            </td>
+                            <td class="px-6 py-4 text-slate-700 whitespace-normal min-w-[200px] bg-blue-50/50">
+                                {{ $finding->keterangan_tindak_lanjut ?? '-' }}
                             </td>
                             <td class="px-6 py-4">{{ $data['closeby'] ?? '-' }}</td>
                             <td class="px-6 py-4">{{ $data['closefungsi'] ?? '-' }}</td>
@@ -106,10 +174,7 @@
                                 @else - @endif
                             </td>
                             <td class="px-6 py-4">{{ $data['userstatus'] ?? '-' }}</td>
-                            <td class="px-6 py-4 text-slate-700 whitespace-normal min-w-[200px] bg-blue-50/50">
-                                {{ $finding->keterangan_tindak_lanjut ?? '-' }}
-                            </td>
-                            <td class="px-6 py-4 text-right sticky right-0 bg-white border-l border-slate-100 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap">
+                                                        <td class="px-6 py-4 text-right sticky right-0 bg-white border-l border-slate-100 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap">
                                 <a href="{{ route('findings.show', $finding->id) }}" class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors mr-2">Detail</a>
                                 
                                 @if(auth()->user()->role === 'Admin HSSE' || (auth()->user()->role === 'Admin Function' && auth()->user()->fungsi === ($data['fungsi'] ?? '')))
@@ -131,9 +196,7 @@
         </div>
         
         <!-- Pagination -->
-        <div class="px-6 py-4 border-t border-slate-200 bg-white">
-            {{ $findings->links() }}
-        </div>
+        
     </div>
 </div>
 

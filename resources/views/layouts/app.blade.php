@@ -75,5 +75,6 @@
 
     <!-- Stack for Page Specific Scripts -->
     @stack('scripts')
+
 </body>
 </html>

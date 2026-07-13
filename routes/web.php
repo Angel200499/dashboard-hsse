@@ -18,6 +18,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/fungsi/{nama_fungsi?}', [DashboardFunctionController::class, 'index'])->name('dashboard.fungsi');
     
     Route::get('/findings', [SipekaFindingController::class, 'index'])->name('findings.index');
+    Route::get('/findings/export', [SipekaFindingController::class, 'export'])->name('findings.export');
+    Route::get('/findings/export-pdf', [SipekaFindingController::class, 'exportPdf'])->name('findings.export.pdf');
     Route::post('/findings/{id}/update', [SipekaFindingController::class, 'update'])->name('findings.update');
     Route::get('/findings/{id}', [SipekaFindingController::class, 'show'])->name('findings.show');
     

@@ -9,10 +9,27 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::all();
-        return view('pages.users.index', compact('users'));
+        $allUsers = User::all();
+        
+        $query = User::query();
+        
+        if ($request->filled('fungsi')) {
+            $query->where('fungsi', $request->fungsi);
+        }
+        
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('username', 'like', "%{$search}%")
+                  ->orWhere('role', 'like', "%{$search}%");
+            });
+        }
+        
+        $users = $query->get();
+        return view('pages.users.index', compact('users', 'allUsers'));
     }
 
     public function store(Request $request)

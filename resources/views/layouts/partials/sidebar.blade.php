@@ -45,10 +45,17 @@
                 <span class="mx-3">Monitoring Temuan</span>
             </a>
             
-            <a class="flex items-center px-3 py-2.5 transition-colors rounded-lg text-slate-600 bg-white hover:bg-slate-50 hover:text-[#9DBF2A]" href="#">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                <span class="mx-3">Export Excel</span>
-            </a>
+            @if(auth()->user()->role === 'Admin HSSE')
+                <a class="flex items-center px-3 py-2.5 transition-colors rounded-lg text-slate-600 bg-white hover:bg-slate-50 hover:text-[#9DBF2A]" href="{{ route('findings.export') }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <span class="mx-3">Export Excel</span>
+                </a>
+                
+                <a class="flex items-center px-3 py-2.5 transition-colors rounded-lg text-slate-600 bg-white hover:bg-slate-50 hover:text-red-600" href="{{ route('findings.export.pdf') }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    <span class="mx-3">Export PDF</span>
+                </a>
+            @endif
 
             @if(auth()->user()->role === 'Admin HSSE')
                 <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-8">Administrator</p>
@@ -60,5 +67,15 @@
             @endif
 
         </nav>
+
+        <div class="mt-auto pt-4 border-t border-slate-100">
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="flex w-full items-center px-3 py-2.5 transition-colors rounded-lg text-slate-600 bg-white hover:bg-red-50 hover:text-red-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <span class="mx-3 text-sm font-medium">Logout</span>
+                </button>
+            </form>
+        </div>
     </div>
 </aside>
