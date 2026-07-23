@@ -18,17 +18,25 @@ class UserFactory extends Factory
 
     /**
      * Define the model's default state.
+     * Sesuai skema users yang sudah dimodifikasi (username, role, fungsi, is_active).
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
+        $roles   = ['Admin HSSE', 'Admin Function', 'Manager HSSE', 'Manager Function'];
+        $fungsis = ['Operation', 'Maintenance', 'HSSE', 'Business Support'];
+
         return [
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
+            'name'              => fake()->name(),
+            'username'          => fake()->unique()->userName(),
+            'email'             => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
+            'password'          => static::$password ??= Hash::make('password'),
+            'role'              => fake()->randomElement($roles),
+            'fungsi'            => fake()->randomElement($fungsis),
+            'is_active'         => true,
+            'remember_token'    => Str::random(10),
         ];
     }
 
@@ -39,6 +47,16 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * User tidak aktif.
+     */
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
         ]);
     }
 }

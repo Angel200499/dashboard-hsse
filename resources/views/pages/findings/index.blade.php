@@ -38,6 +38,51 @@
         </div>
     </div>
 
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <!-- Card 1: Total Temuan -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex items-start justify-between">
+            <div>
+                <p class="text-sm font-semibold text-slate-500 mb-1">Total Temuan</p>
+                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['total'] ?? 0) }}</h3>
+                <div class="mt-2 flex items-center text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full w-fit">
+                    Keseluruhan Data
+                </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+            </div>
+        </div>
+
+        <!-- Card 2: Status Open -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex items-start justify-between">
+            <div>
+                <p class="text-sm font-semibold text-slate-500 mb-1">Status Open & In Progress</p>
+                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['open'] ?? 0) }}</h3>
+                <div class="mt-2 flex items-center text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full w-fit">
+                    Butuh Tindak Lanjut
+                </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-inner">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+        </div>
+
+        <!-- Card 3: Status Closed -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex items-start justify-between">
+            <div>
+                <p class="text-sm font-semibold text-slate-500 mb-1">Status Closed</p>
+                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['closed'] ?? 0) }}</h3>
+                <div class="mt-2 flex items-center text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full w-fit">
+                    Telah Diselesaikan
+                </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center shadow-inner">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+        </div>
+    </div>
+
     <!-- Data Table Card -->
     <div class="bg-white border border-slate-200 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden">
         <div class="overflow-x-auto overflow-y-auto max-h-[600px] relative">
@@ -123,7 +168,7 @@
                             $data = $finding->data_sipeka ?? [];
                         @endphp
                         <tr class="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                            <td class="px-6 py-4">{{ $index + 1 }}</td>
+                            <td class="px-6 py-4">{{ $findings->firstItem() + $index }}</td>
                             <td class="px-6 py-4 font-medium text-slate-900">{{ $finding->id_temuan }}</td>
                             <td class="px-6 py-4">{{ $data['tanggal'] ?? '-' }}</td>
                             <td class="px-6 py-4 whitespace-normal min-w-[250px]">{{ $data['temuan'] ?? '-' }}</td>
@@ -134,19 +179,16 @@
                             <td class="px-6 py-4">{{ $data['unsafe_conditon'] ?? '-' }}</td>
                             <td class="px-6 py-4">
                                 @php 
-                                    $status = strtolower($data['status'] ?? ''); 
-                                    $hasSap = !empty($finding->no_notifikasi_sap);
-                                    $hasKeterangan = !empty($finding->keterangan_tindak_lanjut);
-                                    $isInProgress = $status === 'open' && $hasSap && $hasKeterangan;
+                                    $computedStatus = strtolower($finding->monitoring_status);
                                 @endphp
-                                @if($status === 'closed')
+                                @if($computedStatus === 'closed')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Closed</span>
-                                @elseif($isInProgress)
+                                @elseif($computedStatus === 'in progress')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">In Progress</span>
-                                @elseif($status === 'open')
+                                @elseif($computedStatus === 'open')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Open</span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{{ $data['status'] ?? '-' }}</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{{ $finding->monitoring_status }}</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4">{{ $data['assign'] ?? '-' }}</td>
@@ -177,7 +219,7 @@
                                                         <td class="px-6 py-4 text-right sticky right-0 bg-white border-l border-slate-100 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap">
                                 <a href="{{ route('findings.show', $finding->id) }}" class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors mr-2">Detail</a>
                                 
-                                @if(auth()->user()->role === 'Admin HSSE' || (auth()->user()->role === 'Admin Function' && auth()->user()->fungsi === ($data['fungsi'] ?? '')))
+                                @if(auth()->user()->canEditFinding($finding))
                                 <button type="button" 
                                     onclick="openUpdateModal('{{ $finding->id }}', '{{ $finding->no_notifikasi_sap }}', '{{ addslashes($finding->keterangan_tindak_lanjut) }}')" 
                                     class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium bg-[#9DBF2A] text-white rounded hover:bg-[#8ca825] transition-colors uppercase tracking-wide">Update</button>
@@ -196,7 +238,9 @@
         </div>
         
         <!-- Pagination -->
-        
+        <div class="px-6 py-4 border-t border-slate-200">
+            {{ $findings->appends(request()->query())->links() }}
+        </div>
     </div>
 </div>
 

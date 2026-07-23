@@ -64,7 +64,7 @@
                     <td>{{ $data['temuan'] ?? '-' }}</td>
                     <td>{{ $data['fungsi'] ?? '-' }}</td>
                     <td>{{ $data['kategori'] ?? '-' }}</td>
-                    <td>{{ $data['status'] ?? '-' }}</td>
+                    <td>{{ $finding->monitoring_status }}</td>
                     <td>{{ $finding->no_notifikasi_sap ?? '-' }}</td>
                     <td>{{ $finding->keterangan_tindak_lanjut ?? '-' }}</td>
                 </tr>

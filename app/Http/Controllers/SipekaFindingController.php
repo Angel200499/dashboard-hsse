@@ -2,171 +2,137 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\FindingHistory;
 use App\Models\SipekaFinding;
+use App\Services\ExportService;
+use App\Services\FindingQueryService;
+use App\Http\Requests\UpdateFindingRequest;
+use Illuminate\Http\Request;
 
 class SipekaFindingController extends Controller
 {
+    public function __construct(
+        private readonly FindingQueryService $queryService,
+        private readonly ExportService       $exportService
+    ) {}
+
+    /**
+     * Daftar temuan dengan Search + Filter + Sort + Pagination bersamaan.
+     * Role scope diterapkan otomatis (Function user hanya lihat fungsinya).
+     */
     public function index(Request $request)
     {
+        $user  = auth()->user();
         $query = SipekaFinding::query();
-        
-        $user = auth()->user();
-        if ($user->role === 'Admin Function' || $user->role === 'Manager Function') {
-            $query->where('data_sipeka->fungsi', $user->fungsi);
-        }
-        
-        if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function($q) use ($search) {
-                $q->where('id_temuan', 'like', "%{$search}%")
-                  ->orWhere('no_notifikasi_sap', 'like', "%{$search}%")
-                  ->orWhere('keterangan_tindak_lanjut', 'like', "%{$search}%")
-                  ->orWhere('data_sipeka->temuan', 'like', "%{$search}%")
-                  ->orWhere('data_sipeka->fungsi', 'like', "%{$search}%")
-                  ->orWhere('data_sipeka->pelapor', 'like', "%{$search}%")
-                  ->orWhere('data_sipeka->kategori', 'like', "%{$search}%")
-                  ->orWhere('data_sipeka->unsafe_action', 'like', "%{$search}%")
-                  ->orWhere('data_sipeka->unsafe_conditon', 'like', "%{$search}%")
-                  ->orWhere('data_sipeka->status', 'like', "%{$search}%");
-            });
-        }
-        
-                if ($request->has("date_filter") && $request->get("date_filter") != "") {
-            $filter = $request->get("date_filter");
-            $date = null;
-            if ($filter == "1_day") $date = now()->subDay();
-            elseif ($filter == "3_days") $date = now()->subDays(3);
-            elseif ($filter == "1_week") $date = now()->subWeek();
-            elseif ($filter == "1_month") $date = now()->subMonth();
 
-            if ($date) {
-                $query->where("created_at", ">=", $date);
-            }
-        }
+        // Terapkan scope berdasarkan role + fungsi (Business Rule #8)
+        $this->queryService->applyRoleScope($query, $user);
 
-        // Filter by Status
-        if ($request->filled('status_filter')) {
-            $status = $request->get('status_filter');
-            
-            if ($status === 'in progress') {
-                $query->where('data_sipeka->status', 'like', '%open%')
-                      ->whereNotNull('no_notifikasi_sap')->where('no_notifikasi_sap', '!=', '')
-                      ->whereNotNull('keterangan_tindak_lanjut')->where('keterangan_tindak_lanjut', '!=', '');
-            } elseif ($status === 'open') {
-                $query->where('data_sipeka->status', 'like', '%open%')
-                      ->where(function($q) {
-                          $q->whereNull('no_notifikasi_sap')->orWhere('no_notifikasi_sap', '')
-                            ->orWhereNull('keterangan_tindak_lanjut')->orWhere('keterangan_tindak_lanjut', '');
-                      });
-            } elseif ($status === 'closed') {
-                $query->where('data_sipeka->status', 'like', '%closed%');
-            }
-        }
+        // Hitung KPI khusus fungsi ini (atau keseluruhan jika Admin HSSE)
+        $kpiBase = clone $query;
+        
+        $total = (clone $kpiBase)->count();
+        $closed = (clone $kpiBase)->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'closed'")->count();
+        $inProgress = (clone $kpiBase)->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'open'")
+                                      ->whereNotNull('no_notifikasi_sap')
+                                      ->where('no_notifikasi_sap', '!=', '')
+                                      ->count();
+        $open = max(0, $total - $closed - $inProgress);
+        
+        $kpi = [
+            'total' => $total,
+            'open' => $open,
+            'closed' => $closed
+        ];
 
-        // Sorting Logic
-        $sortBy = $request->get('sort_by');
-        $sortDir = $request->get('sort_dir', 'asc');
-        
-        if ($sortBy === 'status') {
-            $query->orderBy('data_sipeka->status', $sortDir);
-        } elseif ($sortBy === 'no_sap') {
-            $query->orderBy('no_notifikasi_sap', $sortDir);
-        } elseif ($sortBy === 'keterangan') {
-            $query->orderBy('keterangan_tindak_lanjut', $sortDir);
-        } else {
-            $query->latest(); // Default order
-        }
-        
-        $findings = $query->get();
-        
-        return view('pages.findings.index', compact('findings'));
+        // Terapkan search, filter, sort, paginate via service
+        $findings = $this->queryService->paginate($query, $request);
+
+        return view('pages.findings.index', compact('findings', 'kpi'));
     }
 
-    public function update(Request $request, $id)
+    /**
+     * Detail satu finding.
+     */
+    public function show(int $id)
     {
         $finding = SipekaFinding::findOrFail($id);
-        
-        $user = auth()->user();
-        if ($user->role !== 'Admin HSSE') {
-            $data = is_array($finding->data_sipeka) ? $finding->data_sipeka : json_decode($finding->data_sipeka, true);
-            $fungsi = $data['fungsi'] ?? '';
-            
-            if ($user->role !== 'Admin Function' || $user->fungsi !== $fungsi) {
-                abort(403, 'Anda tidak memiliki hak akses untuk mengubah data fungsi ini.');
-            }
+        $user    = auth()->user();
+
+        // Authorization: Role + Fungsi (Business Rule #8)
+        if (!$user->canViewFinding($finding)) {
+            abort(403, 'Anda tidak memiliki hak akses untuk melihat data fungsi ini.');
         }
 
-        $request->validate([
-            'no_notifikasi_sap' => 'nullable|string|max:255',
-            'keterangan_tindak_lanjut' => 'nullable|string',
-        ]);
-        
-        $finding->no_notifikasi_sap = $request->input('no_notifikasi_sap');
+        return view('pages.findings.show', compact('finding'));
+    }
+
+    /**
+     * Update No. Notifikasi SAP dan Keterangan Tindak Lanjut.
+     * Menyimpan audit trail ke finding_histories.
+     */
+    public function update(UpdateFindingRequest $request, int $id)
+    {
+        $finding = SipekaFinding::findOrFail($id);
+        $user    = auth()->user();
+
+        // Authorization: hanya Admin HSSE atau Admin Function fungsinya (Business Rule #8)
+        if (!$user->canEditFinding($finding)) {
+            abort(403, 'Anda tidak memiliki hak akses untuk mengubah data fungsi ini.');
+        }
+
+        // Simpan nilai lama sebelum update (untuk audit trail)
+        $oldNoSap        = $finding->no_notifikasi_sap;
+        $oldKeterangan   = $finding->keterangan_tindak_lanjut;
+
+        // Update field yang diperbolehkan
+        $finding->no_notifikasi_sap        = $request->input('no_notifikasi_sap');
         $finding->keterangan_tindak_lanjut = $request->input('keterangan_tindak_lanjut');
         $finding->save();
+
+        // Rekam riwayat perubahan (Business Rule #13)
+        FindingHistory::create([
+            'finding_id'                   => $finding->id,
+            'updated_by'                   => $user->id,
+            'old_no_notifikasi_sap'        => $oldNoSap,
+            'new_no_notifikasi_sap'        => $finding->no_notifikasi_sap,
+            'old_keterangan_tindak_lanjut' => $oldKeterangan,
+            'new_keterangan_tindak_lanjut' => $finding->keterangan_tindak_lanjut,
+        ]);
 
         return redirect()->back()->with('success', 'Data Tindak Lanjut berhasil diperbarui!');
     }
 
-    public function show($id)
-    {
-        $finding = SipekaFinding::findOrFail($id);
-        
-        $user = auth()->user();
-        if ($user->role === 'Admin Function' || $user->role === 'Manager Function') {
-            $data = is_array($finding->data_sipeka) ? $finding->data_sipeka : json_decode($finding->data_sipeka, true);
-            $fungsi = $data['fungsi'] ?? '';
-            
-            if ($user->fungsi !== $fungsi) {
-                abort(403, 'Anda tidak memiliki hak akses untuk melihat data fungsi ini.');
-            }
-        }
-        
-        return view('pages.findings.show', compact('finding'));
-    }
-
+    /**
+     * Export Excel — hasil Dashboard (Business Rule #7).
+     * Menyertakan no_sap, keterangan, dan Monitoring Status.
+     */
     public function export(Request $request)
     {
-        $fungsi = $request->get('fungsi');
-        $user = auth()->user();
-        
-        // Security check
-        if ($user->role === 'Admin Function' || $user->role === 'Manager Function') {
-            if ($fungsi && $fungsi !== $user->fungsi) {
-                abort(403, 'Unauthorized');
-            }
-            $fungsi = $user->fungsi; // Force to user's function
-        }
-        
-        $fileName = 'Temuan_SIPEKA_' . ($fungsi ?: 'All') . '_' . date('Y-m-d') . '.xlsx';
-        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\SipekaFindingsExport($fungsi), $fileName);
+        $fungsi = $this->exportService->resolveExportFungsi($request->get('fungsi'));
+
+        return $this->exportService->toExcel(
+            fungsi:       $fungsi,
+            statusFilter: $request->get('status_filter'),
+            dateFilter:   $request->get('date_filter'),
+            yearFilter:   $request->get('year'),
+            search:       $request->get('search')
+        );
     }
 
+    /**
+     * Export PDF.
+     */
     public function exportPdf(Request $request)
     {
-        $fungsi = $request->get('fungsi');
-        $user = auth()->user();
-        
-        // Security check
-        if ($user->role === 'Admin Function' || $user->role === 'Manager Function') {
-            if ($fungsi && $fungsi !== $user->fungsi) {
-                abort(403, 'Unauthorized');
-            }
-            $fungsi = $user->fungsi;
-        }
-        
-        if ($fungsi) {
-            $findings = SipekaFinding::where('data_sipeka->fungsi', $fungsi)->get();
-        } else {
-            $findings = SipekaFinding::all();
-        }
+        $fungsi = $this->exportService->resolveExportFungsi($request->get('fungsi'));
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.findings_pdf', compact('findings', 'fungsi'))
-                ->setPaper('a4', 'landscape');
-                
-        $fileName = 'Temuan_SIPEKA_' . ($fungsi ?: 'All') . '_' . date('Y-m-d') . '.pdf';
-        
-        return $pdf->download($fileName);
+        return $this->exportService->toPdf(
+            fungsi:       $fungsi,
+            statusFilter: $request->get('status_filter'),
+            dateFilter:   $request->get('date_filter'),
+            yearFilter:   $request->get('year'),
+            search:       $request->get('search')
+        );
     }
 }

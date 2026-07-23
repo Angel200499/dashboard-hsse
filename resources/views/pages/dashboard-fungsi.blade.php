@@ -83,6 +83,75 @@
         </div>
     </div>
 
+    <!-- Charts Section (Disalin persis dari Dashboard Global sesuai instruksi) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+        
+        <!-- Chart 1: Pelaporan per Fungsi (Pie) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 mb-4">1. Jumlah Pelaporan per Fungsi</h3>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chart1"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 2: Reporting Rate (Horizontal Bar) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 mb-4">2. Reporting Rate per Fungsi</h3>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chart2"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 3: Kategori PEKA (Pie) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 mb-4">3. Kategori PEKA</h3>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chart3"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 4: Keterlibatan Observasi (Stacked Vertical Bar) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 mb-4">4. Keterlibatan dalam Observasi</h3>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chart4"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 5: Persentase Temuan per Fungsi (Stacked Vertical Bar) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 mb-4">5. Rekap Persentase Temuan per Fungsi</h3>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chart5"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 6: Persentase Penindak Lanjut (Donut) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 mb-4">6. Rekap Persentase Penindak Lanjut (By SAP)</h3>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chart6"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 7: Unsafe Action (Horizontal Bar) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 mb-4">7. Unsafe Action Category</h3>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chart7"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 8: Unsafe Condition (Horizontal Bar) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 mb-4">8. Unsafe Condition Category</h3>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chart8"></canvas>
+            </div>
+        </div>
+
+    </div>
+
     <!-- Data Table -->
     <div class="bg-white border border-slate-200 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden mt-8">
         <div class="px-6 py-5 border-b border-slate-200">
@@ -171,7 +240,7 @@
                             $data = $finding->data_sipeka ?? [];
                         @endphp
                         <tr class="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                            <td class="px-6 py-4">{{ $index + 1 }}</td>
+                            <td class="px-6 py-4">{{ $findingsPaginated->firstItem() + $index }}</td>
                             <td class="px-6 py-4 font-medium text-slate-900">{{ $finding->id_temuan }}</td>
                             <td class="px-6 py-4">{{ $data['tanggal'] ?? '-' }}</td>
                             <td class="px-6 py-4 whitespace-normal min-w-[250px]">{{ $data['temuan'] ?? '-' }}</td>
@@ -182,19 +251,16 @@
                             <td class="px-6 py-4">{{ $data['unsafe_conditon'] ?? '-' }}</td>
                             <td class="px-6 py-4">
                                 @php 
-                                    $status = strtolower($data['status'] ?? ''); 
-                                    $hasSap = !empty($finding->no_notifikasi_sap);
-                                    $hasKeterangan = !empty($finding->keterangan_tindak_lanjut);
-                                    $isInProgress = $status === 'open' && $hasSap && $hasKeterangan;
+                                    $computedStatus = strtolower($finding->monitoring_status);
                                 @endphp
-                                @if($status === 'closed')
+                                @if($computedStatus === 'closed')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Closed</span>
-                                @elseif($isInProgress)
+                                @elseif($computedStatus === 'in progress')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">In Progress</span>
-                                @elseif($status === 'open')
+                                @elseif($computedStatus === 'open')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Open</span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{{ $data['status'] ?? '-' }}</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{{ $finding->monitoring_status }}</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4">{{ $data['assign'] ?? '-' }}</td>
@@ -243,6 +309,10 @@
             </table>
         </div>
         
+        <!-- Pagination -->
+        <div class="px-6 py-4 border-t border-slate-200">
+            {{ $findingsPaginated->appends(request()->query())->links() }}
+        </div>
     </div>
 </div>
 
@@ -294,3 +364,185 @@
 </script>
 
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const charts = @json($charts ?? []);
+        if(Object.keys(charts).length === 0) return;
+
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#64748B';
+        const commonOptions = { responsive: true, maintainAspectRatio: false };
+
+        const colors = {
+            'Operation': '#5AA2D7', 
+            'Maintenance': '#ED7D31', 
+            'HSSE': '#A5A5A5', 
+            'Business Support': '#FFC000',
+            'Safe Action': '#5AA2D7',
+            'Safe Condition': '#ED7D31',
+            'Unsafe Action': '#A5A5A5',
+            'Unsafe Condition': '#FFC000',
+        };
+
+        // Helper to get array of values and labels from assoc array
+        const getLabels = (obj) => Object.keys(obj);
+        const getValues = (obj) => Object.values(obj);
+        const getBgColors = (keys) => keys.map(k => colors[k] || '#9CA3AF');
+
+        // 1. Pie Chart - % PEKA Per Fungsi
+        new Chart(document.getElementById('chart1'), {
+            type: 'pie',
+            data: { 
+                labels: getLabels(charts.fungsi), 
+                datasets: [{ 
+                    data: getValues(charts.fungsi), 
+                    backgroundColor: getBgColors(getLabels(charts.fungsi)) 
+                }] 
+            },
+            options: { ...commonOptions, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        // 2. Horizontal Bar - Reporting Rate per Fungsi
+        const rrLabels = getLabels(charts.reporting);
+        const rrValues = getValues(charts.reporting);
+        const rrBgColors = rrLabels.map(l => l === 'AREA LHD' ? '#002060' : (colors[l] || '#9CA3AF'));
+        
+        new Chart(document.getElementById('chart2'), {
+            type: 'bar',
+            data: { 
+                labels: rrLabels, 
+                datasets: [{ data: rrValues, backgroundColor: rrBgColors }] 
+            },
+            options: { 
+                ...commonOptions, 
+                indexAxis: 'y', 
+                plugins: { legend: { display: false } },
+                scales: { 
+                    x: { beginAtZero: true, grid: { display: false } },
+                    y: { grid: { display: false } }
+                },
+                animation: {
+                    onComplete: function() {
+                        var chartInstance = this;
+                        var ctx = chartInstance.ctx;
+                        ctx.font = Chart.helpers.fontString(12, 'normal', Chart.defaults.font.family);
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = '#333';
+
+                        this.data.datasets.forEach(function (dataset, i) {
+                            var meta = chartInstance.getDatasetMeta(i);
+                            meta.data.forEach(function (bar, index) {
+                                var data = dataset.data[index];
+                                ctx.fillText(data, bar.x + 5, bar.y);
+                            });
+                        });
+                    }
+                }
+            }
+        });
+
+        // 3. Pie Chart - Kategori PEKA
+        new Chart(document.getElementById('chart3'), {
+            type: 'pie',
+            data: { 
+                labels: getLabels(charts.kategori), 
+                datasets: [{ 
+                    data: getValues(charts.kategori), 
+                    backgroundColor: getBgColors(getLabels(charts.kategori)) 
+                }] 
+            },
+            options: { ...commonOptions, plugins: { legend: { position: 'right' } } }
+        });
+
+        // 4. Stacked Vertical Bar - Keterlibatan
+        const invLabels = getLabels(charts.keterlibatan);
+        const invData = getValues(charts.keterlibatan);
+        const remData = invData.map(v => 100 - v);
+        
+        new Chart(document.getElementById('chart4'), {
+            type: 'bar',
+            data: {
+                labels: invLabels,
+                datasets: [
+                    { label: 'Keterlibatan', data: invData, backgroundColor: '#ED7D31' },
+                    { label: 'Jumlah', data: remData, backgroundColor: '#5AA2D7' }
+                ]
+            },
+            options: { 
+                ...commonOptions, 
+                scales: { 
+                    x: { stacked: true, grid: { display: false } }, 
+                    y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } } 
+                },
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+
+        // 5. Stacked Vertical Bar - Rekap % Temuan Fungsi
+        const ptLabels = getLabels(charts.persentase_fungsi);
+        const closedData = ptLabels.map(l => charts.persentase_fungsi[l].closed);
+        const openData = ptLabels.map(l => charts.persentase_fungsi[l].open);
+        
+        new Chart(document.getElementById('chart5'), {
+            type: 'bar',
+            data: {
+                labels: ptLabels,
+                datasets: [
+                    { label: 'Closed', data: closedData, backgroundColor: '#548235' },
+                    { label: 'TOTAL (Open)', data: openData, backgroundColor: '#FFC000' }
+                ]
+            },
+            options: { 
+                ...commonOptions, 
+                scales: { 
+                    x: { stacked: true, grid: { display: false } }, 
+                    y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } } 
+                },
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+
+        // 6. Donut Chart - Rekap % Penindak Lanjut Temuan (SAP)
+        new Chart(document.getElementById('chart6'), {
+            type: 'doughnut',
+            data: { 
+                labels: getLabels(charts.tindak_lanjut), 
+                datasets: [{ 
+                    data: getValues(charts.tindak_lanjut), 
+                    backgroundColor: getBgColors(getLabels(charts.tindak_lanjut)) 
+                }] 
+            },
+            options: { ...commonOptions, plugins: { legend: { position: 'right' } } }
+        });
+
+        // Helper for Horizontal Bar charts with Data Labels
+        const renderHorizontalBar = (ctxId, chartData, color) => {
+            const dataArr = Object.entries(chartData.data).map(([k, v]) => ({ label: k, value: v }));
+            
+            new Chart(document.getElementById(ctxId), {
+                type: 'bar',
+                data: { 
+                    labels: dataArr.map(d => d.label), 
+                    datasets: [{ data: dataArr.map(d => d.value), backgroundColor: color }] 
+                },
+                options: { 
+                    ...commonOptions, 
+                    indexAxis: 'y', 
+                    plugins: { legend: { display: false } }, 
+                    scales: { x: { beginAtZero: true, grid: { display: false } }, y: { grid: { display: false } } }
+                }
+            });
+        };
+
+        // 7. Horizontal Bar - Unsafe Action
+        renderHorizontalBar('chart7', charts.unsafe_action, '#ED7D31');
+
+        // 8. Horizontal Bar - Unsafe Condition
+        renderHorizontalBar('chart8', charts.unsafe_condition, '#ED7D31');
+    });
+</script>
+@endpush
