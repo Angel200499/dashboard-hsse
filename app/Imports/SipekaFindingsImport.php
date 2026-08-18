@@ -100,6 +100,7 @@ class SipekaFindingsImport implements
                 'id_temuan'        => 'idtemuan',
                 default            => $k,
             };
+
             $dataSipeka[$k] = $v;
         }
 

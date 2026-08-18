@@ -80,12 +80,77 @@
 
     <!-- Charts Section -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        <!-- Chart 1: Pelaporan per Fungsi (Pie) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">1. Jumlah Pelaporan per Fungsi</h3>
-            <div class="flex-1 relative w-full h-full">
-                <canvas id="chart1"></canvas>
+
+        <!-- Chart 1: Pelaporan per Fungsi — full width dengan panel info -->
+        @php
+            $fi = $charts['fungsi_info'] ?? ['total'=>0,'breakdown'=>[],'tertinggi'=>null,'terendah'=>null];
+        @endphp
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden">
+            <!-- Header card -->
+            <div class="px-6 pt-5 pb-3 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-800">1. Jumlah Pelaporan per Fungsi</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Menampilkan jumlah temuan yang dilaporkan oleh masing-masing fungsi berdasarkan data SIPEKA.</p>
+            </div>
+            <!-- Body: chart kiri + panel kanan -->
+            <div class="flex flex-col md:flex-row">
+                <!-- Pie Chart -->
+                <div class="flex-1 relative p-4 min-h-[320px]">
+                    <canvas id="chart1"></canvas>
+                </div>
+                <!-- Panel Info -->
+                <div class="md:w-72 border-t md:border-t-0 md:border-l border-slate-100 p-5 flex flex-col gap-4 bg-slate-50/50">
+                    <!-- Total -->
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Total Pelaporan</p>
+                        <p class="text-3xl font-bold text-slate-800">{{ number_format($fi['total']) }}</p>
+                    </div>
+                    <!-- Breakdown per fungsi -->
+                    <div class="space-y-2">
+                        @foreach($fi['breakdown'] as $namaFungsi => $jumlah)
+                            @if($jumlah > 0)
+                            @php
+                                $pct = $fi['total'] > 0 ? round($jumlah / $fi['total'] * 100, 1) : 0;
+                                $warna = match($namaFungsi) {
+                                    'Operation'        => 'bg-[#5AA2D7]',
+                                    'Maintenance'      => 'bg-[#ED7D31]',
+                                    'HSSE'             => 'bg-[#A5A5A5]',
+                                    'Business Support' => 'bg-[#FFC000]',
+                                    default            => 'bg-slate-400',
+                                };
+                            @endphp
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 {{ $warna }}"></span>
+                                    <span class="text-sm text-slate-600 truncate">{{ $namaFungsi }}</span>
+                                </div>
+                                <div class="text-right flex-shrink-0">
+                                    <span class="text-sm font-semibold text-slate-800">{{ number_format($jumlah) }}</span>
+                                    <span class="text-xs text-slate-400 ml-1">({{ $pct }}%)</span>
+                                </div>
+                            </div>
+                            @endif
+                        @endforeach
+                    </div>
+                    <!-- Divider -->
+                    <div class="border-t border-slate-200"></div>
+                    <!-- Insight -->
+                    <div class="space-y-2">
+                        @if($fi['tertinggi'])
+                        <div class="rounded-xl bg-green-50 border border-green-100 px-3 py-2">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-green-600 mb-0.5">Pelaporan Tertinggi</p>
+                            <p class="text-sm font-semibold text-slate-800">{{ $fi['tertinggi']['fungsi'] }}</p>
+                            <p class="text-xs text-slate-500">{{ number_format($fi['tertinggi']['jumlah']) }} pelaporan</p>
+                        </div>
+                        @endif
+                        @if($fi['terendah'])
+                        <div class="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-0.5">Pelaporan Terendah</p>
+                            <p class="text-sm font-semibold text-slate-800">{{ $fi['terendah']['fungsi'] }}</p>
+                            <p class="text-xs text-slate-500">{{ number_format($fi['terendah']['jumlah']) }} pelaporan</p>
+                        </div>
+                        @endif
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -166,10 +231,10 @@
             'Maintenance': '#ED7D31', 
             'HSSE': '#A5A5A5', 
             'Business Support': '#FFC000',
-            'Safe Action': '#5AA2D7',
-            'Safe Condition': '#ED7D31',
-            'Unsafe Action': '#A5A5A5',
-            'Unsafe Condition': '#FFC000',
+            'Tindakan aman': '#5AA2D7',
+            'Kondisi aman': '#ED7D31',
+            'Tindakan tidak aman': '#A5A5A5',
+            'Kondisi tidak aman': '#FFC000',
         };
 
         // Helper to get array of values and labels from assoc array
@@ -177,17 +242,40 @@
         const getValues = (obj) => Object.values(obj);
         const getBgColors = (keys) => keys.map(k => colors[k] || '#9CA3AF');
 
-        // 1. Pie Chart - % PEKA Per Fungsi
+        // 1. Pie Chart - Jumlah Pelaporan per Fungsi
+        const chart1Labels = getLabels(charts.fungsi);
+        const chart1Values = getValues(charts.fungsi);
+        const chart1Total  = chart1Values.reduce((a, b) => a + b, 0);
+
         new Chart(document.getElementById('chart1'), {
             type: 'pie',
-            data: { 
-                labels: getLabels(charts.fungsi), 
-                datasets: [{ 
-                    data: getValues(charts.fungsi), 
-                    backgroundColor: getBgColors(getLabels(charts.fungsi)) 
-                }] 
+            data: {
+                labels: chart1Labels,
+                datasets: [{
+                    data: chart1Values,
+                    backgroundColor: getBgColors(chart1Labels),
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                }]
             },
-            options: { ...commonOptions, plugins: { legend: { position: 'bottom' } } }
+            options: {
+                ...commonOptions,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const val = ctx.raw;
+                                const pct = chart1Total > 0 ? ((val / chart1Total) * 100).toFixed(1) : 0;
+                                return [
+                                    ' ' + val.toLocaleString('id-ID') + ' Pelaporan',
+                                    ' ' + pct + '%'
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
         });
 
         // 2. Horizontal Bar - Reporting Rate per Fungsi

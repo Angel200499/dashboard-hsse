@@ -47,6 +47,7 @@ class DashboardChartService
     {
         return [
             'fungsi'            => $this->chartJumlahPerFungsi($fungsi, $tahun),
+            'fungsi_info'       => $this->chartFungsiInfo($fungsi, $tahun),
             'reporting'         => $this->chartReportingRate($fungsi, $tahun),
             'kategori'          => $this->chartKategoriPeka($fungsi, $tahun),
             'keterlibatan'      => $this->chartKeterlibatan($fungsi, $tahun),
@@ -62,13 +63,14 @@ class DashboardChartService
     // -----------------------------------------------------------------
 
     /**
-     * Chart 1 — Jumlah Pelaporan per Fungsi (Pie).
+     * Chart 1 — Jumlah Pelaporan per Fungsi (Pie) — data untuk chart.
+     * Mengembalikan array [fungsi => count] untuk dirender Chart.js.
      */
     private function chartJumlahPerFungsi(?string $fungsi, ?int $tahun): array
     {
         $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
         $result = [];
-        
+
         foreach ($fungsiScope as $f) {
             $count = $this->baseQuery($f, $tahun)->count();
             if ($count > 0) {
@@ -77,6 +79,40 @@ class DashboardChartService
         }
 
         return $result;
+    }
+
+    /**
+     * Chart 1 — Panel Info: total, breakdown per fungsi, tertinggi, terendah.
+     * Data berasal dari database (zero hardcoded).
+     */
+    private function chartFungsiInfo(?string $fungsi, ?int $tahun): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        $breakdown   = [];
+
+        foreach ($fungsiScope as $f) {
+            $count = $this->baseQuery($f, $tahun)->count();
+            $breakdown[$f] = $count;
+        }
+
+        $total = array_sum($breakdown);
+
+        $tertinggi = null;
+        $terendah  = null;
+
+        if (!empty($breakdown)) {
+            $maxVal    = max($breakdown);
+            $minVal    = min($breakdown);
+            $tertinggi = ['fungsi' => array_search($maxVal, $breakdown), 'jumlah' => $maxVal];
+            $terendah  = ['fungsi' => array_search($minVal, $breakdown), 'jumlah' => $minVal];
+        }
+
+        return [
+            'total'     => $total,
+            'breakdown' => $breakdown,
+            'tertinggi' => $tertinggi,
+            'terendah'  => $terendah,
+        ];
     }
 
     /**
@@ -118,7 +154,7 @@ class DashboardChartService
      */
     private function chartKategoriPeka(?string $fungsi, ?int $tahun): array
     {
-        $kategoriList = ['Safe Action', 'Safe Condition', 'Unsafe Action', 'Unsafe Condition'];
+        $kategoriList = ['Tindakan aman', 'Kondisi aman', 'Tindakan tidak aman', 'Kondisi tidak aman'];
 
         $rawData = $this->baseQuery($fungsi, $tahun)
             ->selectRaw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.kategori')) as label, COUNT(*) as total")

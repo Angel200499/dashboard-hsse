@@ -10,8 +10,10 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardFunctionController;
 
 // -----------------------------------------------------------------
-// Guest Routes — Auth
+// Guest Routes — Public & Auth
 // -----------------------------------------------------------------
+Route::view('/', 'welcome')->name('home');
+
 Route::view('/login', 'auth.login')->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -22,7 +24,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
 
     // Dashboard Global — hanya HSSE roles (Function roles di-redirect di controller)
-    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Dashboard Function — semua role bisa akses (otorisasi di controller)
     Route::get('/dashboard/fungsi/{nama_fungsi?}', [DashboardFunctionController::class, 'index'])

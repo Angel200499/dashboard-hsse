@@ -15,7 +15,7 @@
             @if(auth()->user()->role === 'Admin HSSE' || auth()->user()->role === 'Manager HSSE')
                 <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-4">Dashboards</p>
 
-                <a class="flex items-center px-3 py-2.5 transition-colors rounded-lg {{ request()->is('/') ? 'bg-[#9DBF2A] text-white shadow-md shadow-[#9DBF2A]/30' : 'text-slate-600 bg-white hover:bg-slate-50 hover:text-[#9DBF2A]' }}" href="{{ url('/') }}">
+                <a class="flex items-center px-3 py-2.5 transition-colors rounded-lg {{ request()->is('dashboard') ? 'bg-[#9DBF2A] text-white shadow-md shadow-[#9DBF2A]/30' : 'text-slate-600 bg-white hover:bg-slate-50 hover:text-[#9DBF2A]' }}" href="{{ route('dashboard') }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                     <span class="mx-3 flex-1 font-medium">Dashboard Global</span>
                     <span class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">New</span>
