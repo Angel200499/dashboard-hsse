@@ -38,7 +38,7 @@
                 </a>
             @endif
 
-            <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-8">Sistem SIPEKA</p>
+            <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-8">Sistem PEKA</p>
 
             <a class="flex items-center px-3 py-2.5 transition-colors rounded-lg {{ request()->is('findings*') ? 'bg-[#9DBF2A] text-white shadow-md shadow-[#9DBF2A]/30' : 'text-slate-600 bg-white hover:bg-slate-50 hover:text-[#9DBF2A]' }}" href="{{ url('/findings') }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
@@ -80,6 +80,13 @@
                         >
                             <div class="w-1.5 h-1.5 rounded-full mr-3 {{ request()->is('master/manpower*') ? 'bg-[#9DBF2A]' : 'bg-slate-300' }}"></div>
                             <span class="text-sm">Manpower</span>
+                        </a>
+                        <a
+                            class="flex items-center px-3 py-2 transition-colors rounded-r-lg {{ request()->is('master/function-mapping*') ? 'bg-[#9DBF2A]/10 text-[#9DBF2A] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700' }}"
+                            href="{{ route('master.function-mapping.index') }}"
+                        >
+                            <div class="w-1.5 h-1.5 rounded-full mr-3 {{ request()->is('master/function-mapping*') ? 'bg-[#9DBF2A]' : 'bg-slate-300' }}"></div>
+                            <span class="text-sm">Mapping Fungsi</span>
                         </a>
                     </div>
                 </div>

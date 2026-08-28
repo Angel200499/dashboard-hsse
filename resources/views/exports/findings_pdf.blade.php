@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Laporan Temuan SIPEKA</title>
+    <title>Laporan Temuan PEKA</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -32,7 +32,7 @@
     </style>
 </head>
 <body>
-    <h2>Laporan Temuan SIPEKA</h2>
+    <h2>Laporan Temuan PEKA</h2>
     <div class="header-info">
         <p><strong>Tanggal Export:</strong> {{ date('d-m-Y H:i') }}</p>
         <p><strong>Fungsi:</strong> {{ $fungsi ?: 'Semua Fungsi' }}</p>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Lahendong PEKA – Dashboard monitoring pengamatan keselamatan kerja SIPEKA.">
+    <meta name="description" content="Lahendong PEKA – Dashboard monitoring pengamatan keselamatan kerja PEKA.">
     <title>Lahendong PEKA – HSSE PGE Area Lahendong</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SipekaFinding;
+use App\Models\MasterFunctionMapping;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -349,6 +350,12 @@ class DashboardChartService
     /**
      * Base query dengan filter fungsi dan/atau tahun yang sudah diterapkan.
      *
+     * Filter fungsi menggunakan Master Mapping:
+     *   Jika mapping tersedia → WHERE fungsi_sipeka IN (...)
+     *   Jika mapping belum ada → fallback ke LIKE (behavior sebelumnya)
+     *
+     * Fallback menjaga kompatibilitas saat mapping belum diinput Admin HSSE.
+     *
      * Filter tahun menggunakan kolom JSON data_sipeka->tanggal.
      * Format tanggal di Excel SIPEKA diasumsikan mengandung tahun 4 digit (YYYY).
      *
@@ -360,7 +367,19 @@ class DashboardChartService
         $query = SipekaFinding::query();
 
         if ($fungsi) {
-            $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+
+            if (!empty($sipValues)) {
+                // Mapping tersedia: gunakan whereIn untuk hasil yang presisi
+                $query->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                // Fallback: mapping belum diinput, gunakan LIKE seperti sebelumnya
+                // agar dashboard tidak rusak selama masa transisi
+                $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
         }
 
         if ($tahun) {

@@ -11,10 +11,12 @@
             
             <!-- Search Input -->
             <div class="relative w-full max-w-md hidden sm:block">
-                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                </div>
-                <input type="text" class="w-full pl-10 pr-4 py-2 border-none bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:ring-0 focus:outline-none" placeholder="Search (Ctrl+/)">
+                <form action="{{ url('/findings') }}" method="GET" class="w-full relative">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="text" id="global-search-input" name="search" value="{{ request('search') }}" class="w-full pl-10 pr-4 py-2 border-none bg-transparent text-sm text-slate-800 placeholder-slate-400 focus:ring-0 focus:outline-none" placeholder="Search (Ctrl+/)">
+                </form>
             </div>
         </div>
 
@@ -51,11 +53,22 @@
     document.addEventListener('DOMContentLoaded', function() {
         const btn = document.getElementById('mobile-menu-btn');
         const sidebar = document.getElementById('sidebar');
+        const searchInput = document.getElementById('global-search-input');
         
         if(btn && sidebar) {
             btn.addEventListener('click', () => {
                 sidebar.classList.toggle('-translate-x-full');
             });
         }
+
+        // Keyboard shortcut for Search (Ctrl + /)
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === '/') {
+                e.preventDefault();
+                if (searchInput) {
+                    searchInput.focus();
+                }
+            }
+        });
     });
 </script>

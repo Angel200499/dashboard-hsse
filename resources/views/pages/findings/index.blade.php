@@ -1,17 +1,22 @@
 @extends('layouts.app')
 
-@section('title', 'Manajemen Temuan SIPEKA')
+@section('title', 'Manajemen Temuan PEKA')
 
 @section('content')
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Manajemen Temuan SIPEKA</h1>
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-1">
+                <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Manajemen Temuan PEKA</h1>
+                <span class="px-2.5 py-1 text-xs font-semibold bg-[#9DBF2A]/10 text-[#7a961f] rounded-md border border-[#9DBF2A]/20">
+                    Administrator
+                </span>
+            </div>
             <p class="text-sm text-slate-500 mt-1">Data temuan lapangan, update No. SAP, dan Keterangan Tindak Lanjut.</p>
         </div>
         
-                <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3">
             <form action="" method="GET" class="flex flex-wrap items-center gap-3">
                 <div class="relative w-full sm:w-auto">
                     <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -229,7 +234,10 @@
                     @empty
                         <tr>
                             <td colspan="24" class="px-6 py-8 text-center text-slate-500">
-                                Belum ada data SIPEKA. Silakan import file Excel melalui Dashboard.
+                                <p class="text-sm font-medium text-slate-900 mb-1">Tidak Ada Data</p>
+                                <p class="text-sm text-slate-500 max-w-sm mx-auto">
+                                    Belum ada data PEKA. Silakan import file Excel melalui Dashboard.
+                                </p>
                             </td>
                         </tr>
                     @endforelse

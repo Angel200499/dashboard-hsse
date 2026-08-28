@@ -7,8 +7,8 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Dashboard Global HSSE</h1>
-            <p class="text-sm text-slate-500 mt-1">Monitoring dan analitik data temuan SIPEKA secara real-time.</p>
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Dashboard Global HSSE</h1>
+            <p class="text-sm text-slate-500 mt-1">Monitoring dan analitik data temuan PEKA secara real-time.</p>
         </div>
         
         <!-- Action Buttons -->
@@ -21,9 +21,9 @@
                 <form action="{{ route('sipeka.upload') }}" method="POST" enctype="multipart/form-data" class="flex items-center gap-2">
                     @csrf
                     <input type="file" name="sipeka_file" accept=".xlsx,.xls,.csv" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-slate-300 rounded-lg bg-white" required>
-                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all shadow-md shadow-blue-500/20">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Import SIPEKA
+                    <button type="submit" class="bg-[#0055FF] hover:bg-[#0044CC] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition shadow-sm flex items-center gap-2">
+                        <span class="text-lg leading-none">+</span>
+                        Import PEKA
                     </button>
                 </form>
             @endif
@@ -76,8 +76,8 @@
         <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden">
             <!-- Header card -->
             <div class="px-6 pt-5 pb-3 border-b border-slate-100">
-                <h3 class="text-base font-bold text-slate-800">1. Jumlah Pelaporan per Fungsi</h3>
-                <p class="text-xs text-slate-400 mt-0.5">Menampilkan jumlah temuan yang dilaporkan oleh masing-masing fungsi berdasarkan data SIPEKA.</p>
+                <h3 class="text-lg font-semibold text-slate-800">1. Jumlah Pelaporan per Fungsi</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Menampilkan jumlah temuan yang dilaporkan oleh masing-masing fungsi berdasarkan data PEKA.</p>
             </div>
             <!-- Body: chart kiri + panel kanan -->
             <div class="flex flex-col md:flex-row">

@@ -26,7 +26,7 @@ class SipekaImportController extends Controller
         $request->validate([
             'sipeka_file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
         ], [
-            'sipeka_file.required' => 'File SIPEKA wajib dipilih.',
+            'sipeka_file.required' => 'File PEKA wajib dipilih.',
             'sipeka_file.mimes'    => 'File harus berformat .xlsx, .xls, atau .csv.',
             'sipeka_file.max'      => 'Ukuran file maksimal 10MB.',
         ]);

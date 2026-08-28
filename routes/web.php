@@ -9,6 +9,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardFunctionController;
 use App\Http\Controllers\MasterManpowerController;
+use App\Http\Controllers\MasterFunctionMappingController;
 
 // -----------------------------------------------------------------
 // Guest Routes — Public & Auth
@@ -72,5 +73,17 @@ Route::middleware('auth')->group(function () {
              ->name('master.manpower.update');
         Route::delete('/master/manpower/{manpower}', [MasterManpowerController::class, 'destroy'])
              ->name('master.manpower.destroy');
+
+        // -----------------------------------------------------------------
+        // Master Mapping Fungsi — hanya Admin HSSE
+        // -----------------------------------------------------------------
+        Route::get('/master/function-mapping', [MasterFunctionMappingController::class, 'index'])
+             ->name('master.function-mapping.index');
+        Route::post('/master/function-mapping', [MasterFunctionMappingController::class, 'store'])
+             ->name('master.function-mapping.store');
+        Route::put('/master/function-mapping/{mapping}', [MasterFunctionMappingController::class, 'update'])
+             ->name('master.function-mapping.update');
+        Route::delete('/master/function-mapping/{mapping}', [MasterFunctionMappingController::class, 'destroy'])
+             ->name('master.function-mapping.destroy');
     });
 });

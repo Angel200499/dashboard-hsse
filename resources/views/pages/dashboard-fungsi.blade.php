@@ -301,7 +301,10 @@
                     @empty
                         <tr>
                             <td colspan="24" class="px-6 py-8 text-center text-slate-500">
-                                Belum ada data SIPEKA. Silakan import file Excel melalui Dashboard.
+                                <p class="text-sm font-medium text-slate-900 mb-1">Tidak Ada Data</p>
+                                    <p class="text-sm text-slate-500 max-w-sm mx-auto">
+                                        Belum ada data PEKA. Silakan import file Excel melalui Dashboard.
+                                    </p>
                             </td>
                         </tr>
                     @endforelse

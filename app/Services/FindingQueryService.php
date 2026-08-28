@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Models\SipekaFinding;
 use App\Models\User;
+use App\Models\MasterFunctionMapping;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 /**
  * FindingQueryService
@@ -27,12 +29,28 @@ class FindingQueryService
      * Terapkan scope berdasarkan role user.
      *
      * - Admin HSSE / Manager HSSE → semua data
-     * - Admin Function / Manager Function → hanya data fungsinya
+     * - Admin Function / Manager Function → hanya data fungsi mereka
+     *
+     * Filter fungsi menggunakan Master Mapping:
+     *   Jika mapping tersedia → whereIn berdasarkan fungsi_sipeka yang dipetakan
+     *   Jika mapping belum ada → fallback ke LIKE (behavior sebelumnya)
      */
     public function applyRoleScope(Builder $query, User $user): Builder
     {
         if (!$user->isHsseRole()) {
-            $query->where('data_sipeka->fungsi', 'like', "%{$user->fungsi}%");
+            $fungsi    = $user->fungsi;
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+
+            if (!empty($sipValues)) {
+                // Mapping tersedia: user hanya melihat temuan yang terpetakan ke fungsinya
+                $query->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                // Fallback: mapping belum diinput, gunakan LIKE seperti sebelumnya
+                $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
         }
 
         return $query;
@@ -77,17 +95,21 @@ class FindingQueryService
             return;
         }
 
-        $query->where(function (Builder $q) use ($search) {
+        $searchLower = strtolower($search);
+
+        $query->where(function (Builder $q) use ($search, $searchLower) {
+            // Kolom non-JSON (biasanya otomatis case-insensitive dari MySQL)
             $q->where('id_temuan', 'like', "%{$search}%")
               ->orWhere('no_notifikasi_sap', 'like', "%{$search}%")
               ->orWhere('keterangan_tindak_lanjut', 'like', "%{$search}%")
-              ->orWhere('data_sipeka->temuan', 'like', "%{$search}%")
-              ->orWhere('data_sipeka->fungsi', 'like', "%{$search}%")
-              ->orWhere('data_sipeka->pelapor', 'like', "%{$search}%")
-              ->orWhere('data_sipeka->kategori', 'like', "%{$search}%")
-              ->orWhere('data_sipeka->unsafe_action', 'like', "%{$search}%")
-              ->orWhere('data_sipeka->unsafe_conditon', 'like', "%{$search}%")
-              ->orWhere('data_sipeka->status', 'like', "%{$search}%");
+              // Kolom JSON (wajib di-LOWER secara eksplisit karena MySQL JSON extract menggunakan collation binary/case-sensitive)
+              ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.temuan'))) LIKE ?", ["%{$searchLower}%"])
+              ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))) LIKE ?", ["%{$searchLower}%"])
+              ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))) LIKE ?", ["%{$searchLower}%"])
+              ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.kategori'))) LIKE ?", ["%{$searchLower}%"])
+              ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.unsafe_action'))) LIKE ?", ["%{$searchLower}%"])
+              ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.unsafe_conditon'))) LIKE ?", ["%{$searchLower}%"])
+              ->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) LIKE ?", ["%{$searchLower}%"]);
         });
     }
 

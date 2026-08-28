@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\SipekaFinding;
+use App\Models\MasterFunctionMapping;
 use App\Services\DashboardChartService;
 use App\Services\FindingQueryService;
+use Illuminate\Support\Facades\DB;
 
 class DashboardFunctionController extends Controller
 {
@@ -55,10 +57,28 @@ class DashboardFunctionController extends Controller
         $selectedYear = $tahun;
 
         // -----------------------------------------------------------------
+        // Mapping-aware filter helper
+        // Jika mapping tersedia → whereIn; jika belum → fallback LIKE
+        // -----------------------------------------------------------------
+        $sipValues  = MasterFunctionMapping::getSipekaValues($fungsi);
+        $applyFungsiFilter = function ($query) use ($fungsi, $sipValues) {
+            if (!empty($sipValues)) {
+                $query->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                // Fallback: mapping belum diinput Admin HSSE
+                $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
+            return $query;
+        };
+
+        // -----------------------------------------------------------------
         // KPI — difilter by $fungsi + $tahun (jika ada)
         // KPI TIDAK berubah saat user search/filter tabel (query terpisah)
         // -----------------------------------------------------------------
-        $kpiBase = SipekaFinding::where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+        $kpiBase = $applyFungsiFilter(SipekaFinding::query());
 
         if ($tahun) {
             $kpiBase->whereRaw(
@@ -97,9 +117,9 @@ class DashboardFunctionController extends Controller
         // -----------------------------------------------------------------
         // Tabel — FindingQueryService
         // Search + Filter Status + Filter Tahun + Sort + Pagination bersamaan
-        // Difilter by $fungsi terlebih dahulu
+        // Difilter by $fungsi terlebih dahulu menggunakan mapping-aware filter
         // -----------------------------------------------------------------
-        $tableQuery        = SipekaFinding::where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+        $tableQuery        = $applyFungsiFilter(SipekaFinding::query());
         $findingsPaginated = $this->queryService->paginate($tableQuery, $request);
 
         return view('pages.dashboard-fungsi', compact(
