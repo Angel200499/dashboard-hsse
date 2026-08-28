@@ -64,6 +64,25 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     <span class="mx-3">Manajemen Akun</span>
                 </a>
+
+                {{-- Master Data --}}
+                <div class="mt-1">
+                    <div class="flex items-center px-3 py-2 text-slate-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                        </svg>
+                        <span class="mx-3 text-sm font-medium">Master Data</span>
+                    </div>
+                    <div class="ml-5 pl-4 border-l-2 border-slate-100 space-y-0.5">
+                        <a
+                            class="flex items-center px-3 py-2 transition-colors rounded-r-lg {{ request()->is('master/manpower*') ? 'bg-[#9DBF2A]/10 text-[#9DBF2A] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700' }}"
+                            href="{{ route('master.manpower.index') }}"
+                        >
+                            <div class="w-1.5 h-1.5 rounded-full mr-3 {{ request()->is('master/manpower*') ? 'bg-[#9DBF2A]' : 'bg-slate-300' }}"></div>
+                            <span class="text-sm">Manpower</span>
+                        </a>
+                    </div>
+                </div>
             @endif
 
         </nav>

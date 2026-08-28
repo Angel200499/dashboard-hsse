@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Lahendong PEKA – Sistem monitoring pengamatan keselamatan kerja SIPEKA untuk Pertamina Geothermal Energy Area Lahendong.">
+    <meta name="description" content="Lahendong PEKA – Dashboard monitoring pengamatan keselamatan kerja SIPEKA.">
     <title>Lahendong PEKA – HSSE PGE Area Lahendong</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,8 +18,8 @@
         :root {
             --blue:   #0057B8;
             --blue-d: #003F8A;
-            --green:  #A2AD00;
-            --green-d:#858E00;
+            --green:  #9DBF2A;
+            --green-d:#89A924;
             --red:    #C8102E;
             --ink:    #222222;
             --body:   #3D4E60;
@@ -51,7 +51,7 @@
             padding: 0 64px; height: 66px;
             display: flex; align-items: center; justify-content: space-between;
         }
-        .nav-logo { height: 32px; }
+        .nav-logo { height: 44px; }
         .nav-right { display: flex; align-items: center; gap: 20px; }
         .nav-label { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
         .nav-divider { width: 1px; height: 16px; background: var(--rule); }
@@ -90,8 +90,7 @@
             content: ''; position: absolute; left: 0; bottom: -3px;
             width: 100%; height: 4px; background: var(--red); border-radius: 2px;
         }
-        .hero-desc { font-size: 15px; line-height: 1.8; color: var(--body); max-width: 460px; margin-bottom: 48px; }
-        .hero-desc strong { color: var(--ink); font-weight: 600; }
+        .hero-desc { font-size: 15px; line-height: 1.8; color: var(--body); max-width: 480px; margin-bottom: 48px; }
         .hero-actions { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
         .btn-primary {
             display: inline-flex; align-items: center; gap: 9px;
@@ -99,14 +98,7 @@
             border-radius: 7px; font-size: 14px; font-weight: 700; text-decoration: none;
             transition: background .18s, box-shadow .18s, transform .15s;
         }
-        .btn-primary:hover { background: var(--green-d); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(162,173,0,.25); }
-        .btn-ghost {
-            font-size: 13px; font-weight: 500; color: var(--muted);
-            text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: color .18s;
-        }
-        .btn-ghost:hover { color: var(--ink); }
-        .btn-ghost svg { transition: transform .18s; }
-        .btn-ghost:hover svg { transform: translateX(3px); }
+        .btn-primary:hover { background: var(--green-d); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(157,191,42,.25); }
 
         .hero-right {
             background-color: var(--ink);
@@ -116,40 +108,26 @@
             position: relative; overflow: hidden;
         }
 
-
-        /* STATS */
+        /* STATS (INFO CARDS) */
         .stats { background: var(--bg); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
-        .stats-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(4,1fr); padding: 0 64px; }
-        .stat { padding: 40px 36px; border-right: 1px solid var(--rule); }
-        .stat:first-child { padding-left: 0; }
+        .stats-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); padding: 0 64px; }
+        .stat { padding: 40px 36px; border-right: 1px solid var(--rule); text-align: center; }
         .stat:last-child  { border-right: none; }
-        .stat-num { font-size: 36px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; margin-bottom: 8px; }
-        .c-blue  { color: var(--blue); }
-        .c-green { color: var(--green-d); }
-        .c-ink   { color: var(--ink); }
-        .stat-label { font-size: 13px; color: var(--muted); line-height: 1.5; }
+        .stat-num { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; margin-bottom: 8px; color: var(--ink); }
+        .stat-label { font-size: 14px; color: var(--muted); line-height: 1.5; font-weight: 500; }
+        
+        .stat:nth-child(1) .stat-num { color: var(--blue); }
+        .stat:nth-child(2) .stat-num { color: var(--red); }
+        .stat:nth-child(3) .stat-num { color: var(--green-d); }
 
-        /* ABOUT */
-        .about { padding: 96px 64px; max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 320px 1fr; gap: 96px; align-items: start; }
-        .about-sticky { position: sticky; top: 96px; }
-        .sec-label { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--green-d); display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+        /* NILAI SECTION */
+        .pillars { padding: 96px 64px; max-width: 1200px; margin: 0 auto; }
+        .sec-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green-d); display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
         .sec-label::before { content: ''; width: 22px; height: 2px; background: var(--green); border-radius: 1px; }
-        .sec-h2 { font-size: clamp(26px, 3vw, 38px); font-weight: 800; letter-spacing: -0.025em; line-height: 1.15; color: var(--ink); margin-bottom: 18px; }
-        .sec-h2 em { font-style: normal; color: var(--blue); }
-        .about-lead { font-size: 14px; line-height: 1.8; color: var(--body); }
-        .about-row { display: grid; grid-template-columns: 48px 1fr; gap: 20px; padding: 28px 0; border-bottom: 1px solid var(--rule); }
-        .about-row:first-child { padding-top: 0; }
-        .about-row:last-child  { border-bottom: none; padding-bottom: 0; }
-        .row-num { font-size: 11px; font-weight: 700; color: var(--rule); letter-spacing: 0.05em; padding-top: 3px; transition: color .2s; }
-        .about-row:hover .row-num { color: var(--green); }
-        .row-title { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 8px; letter-spacing: -0.01em; }
-        .row-body  { font-size: 14px; line-height: 1.75; color: var(--body); }
-
-        /* PILLARS */
-        .pillars { background: var(--bg); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 80px 64px; }
-        .pillars-hd { max-width: 1200px; margin: 0 auto 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: end; }
-        .pillars-hd-right { font-size: 15px; color: var(--body); line-height: 1.75; }
-        .cards { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; }
+        .sec-h2 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 800; letter-spacing: -0.025em; line-height: 1.15; color: var(--ink); margin-bottom: 24px; }
+        .sec-desc { font-size: 16px; line-height: 1.8; color: var(--body); max-width: 600px; margin-bottom: 64px; }
+        
+        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
         .card { 
             padding: 48px 40px; 
             background: var(--white);
@@ -167,21 +145,14 @@
         .card-blue .card-num { color: var(--blue); }
         .card-green .card-num { color: var(--green-d); }
         .card-ink .card-num { color: var(--red); }
-        .card-word { font-size: 28px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.2; color: var(--ink); margin-bottom: 16px; }
-        .card-text { font-size: 14px; line-height: 1.7; color: var(--body); flex-grow: 1; }
-        .card-tag  { 
-            align-self: flex-start;
-            margin-top: 28px; padding: 6px 14px; border-radius: 100px; 
-            font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; 
-        }
-        .card-blue  .card-tag { background: rgba(0,87,184,0.08); color: var(--blue-d); }
-        .card-green .card-tag { background: rgba(162,173,0,0.12); color: var(--green-d); }
-        .card-ink   .card-tag { background: rgba(200,16,46,0.08); color: var(--red); }
+        .card-word { font-size: 26px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.3; color: var(--ink); margin-bottom: 12px; }
+        .card-subtitle { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 16px; }
+        .card-text { font-size: 15px; line-height: 1.7; color: var(--body); flex-grow: 1; }
 
         /* CTA */
         .cta { 
             background: linear-gradient(135deg, var(--ink) 0%, #111 100%);
-            padding: 80px 64px; display: flex; align-items: center; justify-content: space-between; gap: 48px; 
+            padding: 80px 64px; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; gap: 32px; 
             position: relative; overflow: hidden;
         }
         .cta::before {
@@ -190,17 +161,16 @@
             background: radial-gradient(ellipse at center, rgba(0,87,184,0.15) 0%, rgba(0,0,0,0) 70%);
             transform: rotate(-45deg);
         }
-        .cta h2 { position: relative; font-size: clamp(24px, 3.5vw, 40px); font-weight: 900; letter-spacing: -0.02em; color: var(--white); line-height: 1.2; margin-bottom: 12px; }
-        .cta p  { position: relative; font-size: 16px; color: rgba(255,255,255,.6); max-width: 500px; line-height: 1.6; }
+        .cta h2 { position: relative; font-size: clamp(28px, 4vw, 48px); font-weight: 900; letter-spacing: -0.02em; color: var(--white); line-height: 1.2; }
 
         /* FOOTER */
-        footer { background: var(--white); border-top: 1px solid var(--rule); padding: 20px 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-        footer p { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+        footer { background: var(--white); border-top: 1px solid var(--rule); padding: 24px 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+        footer p { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
         footer .heart { color: var(--red); }
         .foot-links { display: flex; gap: 24px; }
-        .foot-links a { font-size: 12px; color: var(--muted); text-decoration: none; transition: color .18s; }
+        .foot-links a { font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; transition: color .18s; }
         .foot-links a:hover { color: var(--ink); }
-        .colorbar { height: 3px; display: flex; }
+        .colorbar { height: 4px; display: flex; }
         .colorbar span:nth-child(1) { flex: 3; background: var(--blue); }
         .colorbar span:nth-child(2) { flex: 1; background: var(--red); }
         .colorbar span:nth-child(3) { flex: 1; background: var(--green); }
@@ -208,7 +178,6 @@
         /* RESPONSIVE */
         @media (max-width: 1024px) {
             nav, footer, .cta, .pillars { padding-left: 32px; padding-right: 32px; }
-            .about { padding-left: 32px; padding-right: 32px; gap: 48px; }
             .stats-grid { padding: 0 32px; }
             .hero { grid-template-columns: 1fr 300px; }
             .hero-left { padding-left: 32px; padding-right: 40px; }
@@ -219,18 +188,13 @@
             .hero { grid-template-columns: 1fr; }
             .hero-right { min-height: 220px; }
             .hero-left { padding: 56px 24px; }
-            .stats-grid { grid-template-columns: repeat(2,1fr); padding: 0 24px; }
-            .stat { padding: 28px 20px; }
-            .stat:nth-child(2) { border-right: none; }
-            .stat:nth-child(3) { border-right: 1px solid var(--rule); }
-            .about { grid-template-columns: 1fr; padding: 64px 24px; gap: 40px; }
-            .about-sticky { position: static; }
-            .pillars-hd { grid-template-columns: 1fr; gap: 12px; }
-            .cards { grid-template-columns: 1fr; gap: 20px; }
-            .pillars { padding: 56px 24px; }
-            .cta { flex-direction: column; padding: 56px 24px; gap: 24px; }
-            footer { padding: 20px 24px; flex-wrap: wrap; gap: 12px; }
-            .foot-links { gap: 16px; }
+            .stats-grid { grid-template-columns: 1fr; padding: 0 24px; }
+            .stat { padding: 24px 20px; border-right: none; border-bottom: 1px solid var(--rule); }
+            .stat:last-child { border-bottom: none; }
+            .cards { grid-template-columns: 1fr; gap: 24px; }
+            .pillars { padding: 64px 24px; }
+            .cta { padding: 64px 24px; }
+            footer { padding: 24px; flex-wrap: wrap; gap: 16px; justify-content: center; text-align: center; }
         }
     </style>
 </head>
@@ -252,10 +216,14 @@
         <div class="hero-left">
             <span class="hero-tag">HSSE · PGE Area Lahendong</span>
             <h1>Dashboard<br><span class="hl-blue">Lahendong</span><br><span class="hl-red">PEKA</span></h1>
-            <p class="hero-desc">Sistem monitoring data pengamatan keselamatan kerja yang dikembangkan khusus untuk mendukung proses pengelolaan data <strong>SIPEKA</strong> di Pertamina Geothermal Energy Area Lahendong.</p>
+            <p class="hero-desc">Dashboard monitoring pengamatan keselamatan kerja untuk mendukung pengelolaan data <strong>PEKA</strong> di Pertamina Geothermal Energy Area Lahendong.</p>
             <div class="hero-actions">
-                <a href="{{ route('login') }}" class="btn-primary">Masuk ke Dashboard <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
-                <a href="#tentang" class="btn-ghost">Tentang PEKA <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></a>
+                @auth
+                    <a href="{{ route('dashboard') }}" class="btn-primary">Masuk ke Dashboard &rarr;</a>
+                @else
+                    <a href="{{ route('login') }}" class="btn-primary">Masuk ke Dashboard &rarr;</a>
+                @endauth
+                <a href="#tentang" class="btn-ghost" style="font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: color .18s; padding: 13px 26px;">Tentang PEKA &rsaquo;</a>
             </div>
         </div>
         <div class="hero-right">
@@ -265,100 +233,59 @@
     <div class="stats">
         <div class="stats-grid">
             <div class="stat">
-                <div class="stat-num c-blue">4<span style="font-size:.6em">+</span></div>
-                <div class="stat-label">Fungsi kerja yang dipantau secara terpusat</div>
+                <div class="stat-num">PEKA</div>
+                <div class="stat-label">Sumber data monitoring</div>
             </div>
             <div class="stat">
-                <div class="stat-num c-green">Real<span style="font-size:.55em;letter-spacing:0">-time</span></div>
-                <div class="stat-label">Data langsung dari export sistem SIPEKA</div>
+                <div class="stat-num">Temuan</div>
+                <div class="stat-label">Monitoring &amp; tindak lanjut</div>
             </div>
             <div class="stat">
-                <div class="stat-num c-ink">360<span style="font-size:.55em">°</span></div>
-                <div class="stat-label">Visibilitas dari identifikasi hingga tindak lanjut</div>
-            </div>
-            <div class="stat">
-                <div class="stat-num c-blue">HSSE</div>
-                <div class="stat-label">Berbasis budaya keselamatan &amp; proaktif bahaya</div>
+                <div class="stat-num">HSSE</div>
+                <div class="stat-label">Budaya keselamatan kerja</div>
             </div>
         </div>
     </div>
 
-    <div class="about" id="tentang">
-        <div class="about-sticky">
-            <p class="sec-label">Tentang</p>
-            <h2 class="sec-h2">Mengapa <em>Lahendong PEKA</em>?</h2>
-            <p class="about-lead">Nama ini merepresentasikan identitas area kerja sekaligus sumber utama data yang digunakan, sehingga mudah dikenali oleh seluruh pengguna di lingkungan perusahaan.</p>
-        </div>
-        <div class="about-rows">
-            <div class="about-row">
-                <div class="row-num">01</div>
-                <div>
-                    <div class="row-title">Identitas Area Kerja</div>
-                    <p class="row-body">Dashboard ini dikembangkan khusus untuk mendukung proses monitoring data PEKA di <strong>Pertamina Geothermal Energy Area Lahendong</strong>. Nama tersebut merepresentasikan identitas area kerja sekaligus sumber utama data, yaitu hasil export <strong>SIPEKA</strong>, sehingga mudah dikenali oleh seluruh pengguna di lingkungan perusahaan.</p>
-                </div>
-            </div>
-            <div class="about-row">
-                <div class="row-num">02</div>
-                <div>
-                    <div class="row-title">Makna Filosofis PEKA</div>
-                    <p class="row-body">Kata "PEKA" memiliki makna filosofis: sikap <strong>peduli</strong>, <strong>peka</strong> terhadap situasi dan kondisi, serta <strong>tanggap</strong> dalam mengidentifikasi dan menindaklanjuti setiap temuan di lingkungan kerja.</p>
-                </div>
-            </div>
-            <div class="about-row">
-                <div class="row-num">03</div>
-                <div>
-                    <div class="row-title">Selaras Budaya HSSE</div>
-                    <p class="row-body">Nilai tersebut sejalan dengan budaya keselamatan (HSSE) yang mendorong setiap pekerja untuk lebih <strong>sadar</strong>, <strong>peduli</strong>, dan <strong>proaktif</strong> terhadap potensi bahaya maupun peluang perbaikan di seluruh area operasi Pertamina Geothermal Energy.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="pillars">
-        <div class="pillars-hd">
-            <div>
-                <p class="sec-label">Tiga Pilar</p>
-                <h2 class="sec-h2">Nilai di Balik <em>PEKA</em></h2>
-            </div>
-            <p class="pillars-hd-right">Tiga sikap yang membentuk budaya keselamatan proaktif — bukan sekadar kepatuhan, melainkan kepedulian nyata terhadap sesama dan lingkungan kerja.</p>
-        </div>
+    <div class="pillars" id="tentang">
+        <p class="sec-label">NILAI LAHENDONG PEKA</p>
+        <h2 class="sec-h2">Badengar. Ba Inga. Parduli.</h2>
+        <p class="sec-desc">Tiga nilai sederhana yang mengingatkan setiap pekerja Lahendong untuk memperhatikan, mengingat, dan peduli terhadap keselamatan di lingkungan kerja.</p>
+        
         <div class="cards">
             <div class="card card-blue">
                 <div class="card-num">01</div>
-                <div class="card-word">Peduli</div>
-                <p class="card-text">Rasa kepedulian yang tulus terhadap sesama rekan kerja, lingkungan, dan keberlangsungan operasi. Setiap potensi bahaya layak dilaporkan, sekecil apapun.</p>
-                <span class="card-tag">Awareness</span>
+                <div class="card-word">Badengar</div>
+                <div class="card-subtitle">Setiap temuan layak didengar.</div>
+                <p class="card-text">Perhatikan kondisi dan kejadian di sekitar kita. Jangan abaikan potensi bahaya maupun hal yang dapat diperbaiki.</p>
             </div>
             <div class="card card-green">
                 <div class="card-num">02</div>
-                <div class="card-word">Peka</div>
-                <p class="card-text">Kemampuan memperhatikan detail — melihat kondisi tidak aman, perilaku menyimpang, atau peluang perbaikan yang sering terlewatkan dalam rutinitas harian.</p>
-                <span class="card-tag">Observation</span>
+                <div class="card-word">Ba Inga</div>
+                <div class="card-subtitle">Setiap temuan perlu diingat.</div>
+                <p class="card-text">Pastikan informasi temuan dan proses tindak lanjut tetap tercatat dan terpantau.</p>
             </div>
             <div class="card card-ink">
                 <div class="card-num">03</div>
-                <div class="card-word">Tanggap</div>
-                <p class="card-text">Bertindak cepat dan tepat. Temuan yang teridentifikasi segera ditindaklanjuti sehingga risiko dapat dimitigasi sebelum berkembang menjadi insiden.</p>
-                <span class="card-tag">Action</span>
+                <div class="card-word">Parduli</div>
+                <div class="card-subtitle">Peduli melalui tindakan.</div>
+                <p class="card-text">Wujudkan kepedulian dengan melaporkan temuan dan memastikan tindak lanjut dilakukan.</p>
             </div>
         </div>
     </div>
 
     <div class="cta">
-        <div>
-            <h2>Siap mulai monitoring keselamatan?</h2>
-            <p>Masuk menggunakan akun yang telah diberikan oleh Admin HSSE Area Lahendong.</p>
-        </div>
-        <a href="{{ route('login') }}" class="btn-primary">Login Sekarang <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
+        <h2>Mari membangun budaya keselamatan bersama.</h2>
+        @auth
+            <a href="{{ route('dashboard') }}" class="btn-primary">Masuk ke Dashboard <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
+        @else
+            <a href="{{ route('login') }}" class="btn-primary">Masuk ke Dashboard <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
+        @endauth
     </div>
 
     <footer>
         <p>&copy; {{ date('Y') }}, Made with <span class="heart">&#9829;</span> by HSSE PGE Area Lahendong</p>
-        <div class="foot-links">
-            <a href="#tentang">Tentang</a>
-            <a href="#tentang">Filosofi PEKA</a>
-            <a href="{{ route('login') }}">Login</a>
-        </div>
+
     </footer>
     <div class="colorbar"><span></span><span></span><span></span></div>
 

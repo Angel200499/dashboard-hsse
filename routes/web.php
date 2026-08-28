@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardFunctionController;
+use App\Http\Controllers\MasterManpowerController;
 
 // -----------------------------------------------------------------
 // Guest Routes — Public & Auth
@@ -59,5 +60,17 @@ Route::middleware('auth')->group(function () {
              ->name('sipeka.upload');
 
         Route::resource('users', UserController::class)->except(['show']);
+
+        // -----------------------------------------------------------------
+        // Master Data — hanya Admin HSSE
+        // -----------------------------------------------------------------
+        Route::get('/master/manpower', [MasterManpowerController::class, 'index'])
+             ->name('master.manpower.index');
+        Route::post('/master/manpower', [MasterManpowerController::class, 'store'])
+             ->name('master.manpower.store');
+        Route::put('/master/manpower/{manpower}', [MasterManpowerController::class, 'update'])
+             ->name('master.manpower.update');
+        Route::delete('/master/manpower/{manpower}', [MasterManpowerController::class, 'destroy'])
+             ->name('master.manpower.destroy');
     });
 });
