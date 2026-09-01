@@ -28,9 +28,22 @@ Route::middleware('auth')->group(function () {
     // Dashboard Global — hanya HSSE roles (Function roles di-redirect di controller)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Export PDF Rekap Pelapor Business Support
+    // Route ini HARUS didefinisikan SEBELUM route fungsi wildcard agar tidak tertangkap sebagai {nama_fungsi}
+    Route::get('/dashboard/fungsi/business-support/rekap-pelapor/pdf', [DashboardFunctionController::class, 'exportBusinessSupportReporterPdf'])
+         ->name('dashboard.business-support.rekap-pelapor.pdf');
+
+    // Halaman Rekap Pelapor Business Support — halaman tersendiri
+    // Accessible: Admin HSSE, Manager HSSE, Admin Function BS, Manager Function BS
+    // Otorisasi detail ditangani di controller
+    Route::get('/dashboard/fungsi/business-support/rekap-pelapor', [DashboardFunctionController::class, 'rekapPelapor'])
+         ->name('dashboard.business-support.rekap-pelapor');
+
     // Dashboard Function — semua role bisa akses (otorisasi di controller)
     Route::get('/dashboard/fungsi/{nama_fungsi?}', [DashboardFunctionController::class, 'index'])
          ->name('dashboard.fungsi');
+
+
 
     // -----------------------------------------------------------------
     // Findings — semua authenticated user bisa lihat & filter

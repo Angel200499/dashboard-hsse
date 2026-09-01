@@ -8,6 +8,7 @@ use App\Models\MasterFunctionMapping;
 use App\Services\DashboardChartService;
 use App\Services\FindingQueryService;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class DashboardFunctionController extends Controller
 {
@@ -130,4 +131,123 @@ class DashboardFunctionController extends Controller
             'selectedYear'
         ));
     }
+
+    // -----------------------------------------------------------------
+    // EXPORT PDF — Rekap Pelapor Business Support
+    // -----------------------------------------------------------------
+
+    /**
+     * Generate dan download PDF Rekap Pelapor Business Support.
+     *
+     * Endpoint ini dikunci ke fungsi Business Support saja.
+     * Data diambil dari service yang sama dengan dashboard agar konsisten.
+     *
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    public function exportBusinessSupportReporterPdf(Request $request)
+    {
+        // Otorisasi: hanya user fungsi Business Support (Admin & Manager)
+        $user = auth()->user();
+        if (strtolower($user->fungsi) !== 'business support') {
+            abort(403, 'Anda tidak memiliki akses ke rekap Business Support.');
+        }
+
+        $rekapPeriode = (string) $request->get('rekap_periode', '');
+        $rekapBulan   = (int) $request->get('rekap_bulan', now()->month);
+        $rekapTahun   = (int) $request->get('rekap_tahun', now()->year);
+        $rekapSearch  = (string) $request->get('rekap_search', '');
+        $rekapSearch  = trim($rekapSearch);
+
+        $rekapPelapor = $this->chartService->getBusinessSupportReporterRecap(
+            $rekapPeriode,
+            $rekapBulan,
+            $rekapTahun,
+            $rekapSearch
+        );
+
+        $pdf = Pdf::loadView('pdf.business-support-rekap-pelapor', [
+            'rekapPelapor'  => $rekapPelapor,
+            'rekapPeriode'  => $rekapPeriode,
+            'rekapBulan'    => $rekapBulan,
+            'rekapTahun'    => $rekapTahun,
+            'rekapSearch'   => $rekapSearch,
+            'generatedAt'   => now()->format('d/m/Y H:i'),
+        ])->setPaper('a4', 'portrait');
+
+        // Nama file dinamis berdasarkan periode
+        $filename = $this->buildPdfFilename($rekapPeriode, $rekapBulan, $rekapTahun);
+
+        return $pdf->download($filename);
+    }
+
+    // -----------------------------------------------------------------
+    // HALAMAN REKAP PELAPOR — Business Support (halaman tersendiri)
+    // -----------------------------------------------------------------
+
+    /**
+     * Halaman Rekap Pelapor Business Support.
+     *
+     * Accessible oleh:
+     *   - Admin HSSE / Manager HSSE (global access)
+     *   - Admin Function Business Support
+     *   - Manager Function Business Support
+     *
+     * Tidak accessible oleh fungsi lain.
+     */
+    public function rekapPelapor(Request $request)
+    {
+        $user = auth()->user();
+
+        // Otorisasi: hanya user fungsi Business Support (Admin & Manager)
+        if (strtolower($user->fungsi) !== 'business support') {
+            abort(403, 'Anda tidak memiliki akses ke halaman ini.');
+        }
+
+        $rekapPeriode = (string) $request->get('rekap_periode', '');
+        $rekapBulan   = (int) $request->get('rekap_bulan', now()->month);
+        $rekapTahun   = (int) $request->get('rekap_tahun', now()->year);
+        $rekapSearch  = (string) $request->get('rekap_search', '');
+        $rekapSearch  = trim($rekapSearch);
+
+        $rekapPelapor = $this->chartService->getBusinessSupportReporterRecap(
+            $rekapPeriode,
+            $rekapBulan,
+            $rekapTahun,
+            $rekapSearch
+        );
+
+        return view('pages.business-support.rekap-pelapor', compact(
+            'rekapPelapor',
+            'rekapPeriode',
+            'rekapBulan',
+            'rekapTahun',
+            'rekapSearch'
+        ));
+    }
+
+    /**
+     * Bangun nama file PDF yang informatif berdasarkan periode.
+     */
+    private function buildPdfFilename(string $periode, int $bulan, int $tahun): string
+    {
+        if (empty($periode)) {
+            return 'rekap-pelapor-business-support-semua-waktu.pdf';
+        }
+
+        if ($periode === 'per_bulan') {
+            $paddedBulan = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+            return "rekap-pelapor-business-support-{$tahun}-{$paddedBulan}.pdf";
+        }
+
+        $suffix = match ($periode) {
+            '1_day'   => '1-hari-terakhir',
+            '3_days'  => '3-hari-terakhir',
+            '1_week'  => '1-minggu-terakhir',
+            '1_month' => '1-bulan-terakhir',
+            default   => 'semua-waktu',
+        };
+
+        return "rekap-pelapor-business-support-{$suffix}.pdf";
+    }
 }
+

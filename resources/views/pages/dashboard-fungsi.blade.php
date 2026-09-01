@@ -152,7 +152,9 @@
 
     </div>
 
-    <!-- Data Table -->
+    {{-- Data Table --}}
+
+
     <div class="bg-white border border-slate-200 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden mt-8">
         <div class="px-6 py-5 border-b border-slate-200">
             <h3 class="text-lg font-bold text-slate-800">Daftar Temuan Fungsi {{ $fungsi }}</h3>
@@ -291,9 +293,13 @@
                                                         <td class="px-6 py-4 text-right sticky right-0 bg-white border-l border-slate-100 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] whitespace-nowrap">
                                 <a href="{{ route('findings.show', $finding->id) }}" class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors mr-2">Detail</a>
                                 
-                                @if(auth()->user()->role === 'Admin HSSE' || (auth()->user()->role === 'Admin Function' && auth()->user()->fungsi === ($data['fungsi'] ?? '')))
+                                @if(auth()->user()->canEditFinding($finding))
                                 <button type="button" 
-                                    onclick="openUpdateModal('{{ $finding->id }}', '{{ $finding->no_notifikasi_sap }}', '{{ addslashes($finding->keterangan_tindak_lanjut) }}')" 
+                                    data-id="{{ $finding->id }}"
+                                    data-sap="{{ $finding->no_notifikasi_sap }}"
+                                    data-keterangan="{{ $finding->keterangan_tindak_lanjut }}"
+                                    data-status="{{ $computedStatus }}"
+                                    onclick="openUpdateModal(this)"
                                     class="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium bg-[#9DBF2A] text-white rounded hover:bg-[#8ca825] transition-colors uppercase tracking-wide">Update</button>
                                 @endif
                             </td>
@@ -351,9 +357,30 @@
 </div>
 
 <script>
-    function openUpdateModal(id, sap, keterangan) {
+    function openUpdateModal(button) {
+        const id = button.getAttribute('data-id');
+        const sap = button.getAttribute('data-sap');
+        const keterangan = button.getAttribute('data-keterangan');
+        const status = button.getAttribute('data-status');
+        
         document.getElementById('updateModal').classList.remove('hidden');
-        document.getElementById('modal_sap').value = sap || '';
+        
+        const sapInput = document.getElementById('modal_sap');
+        sapInput.value = sap || '';
+
+        
+        // Hanya bisa update SAP jika status temuan SIPEKA belum closed 
+        // (Monitoring status: Open atau In Progress)
+        if (status !== 'closed') {
+            sapInput.readOnly = false;
+            sapInput.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+            sapInput.classList.add('bg-white', 'text-slate-900');
+        } else {
+            sapInput.readOnly = true;
+            sapInput.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+            sapInput.classList.remove('bg-white', 'text-slate-900');
+        }
+
         document.getElementById('modal_keterangan').value = keterangan || '';
         
         // Setup form action route

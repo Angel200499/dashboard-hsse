@@ -128,7 +128,17 @@ class User extends Authenticatable
         }
 
         if ($this->role === 'Admin Function') {
-            $findingFungsi = $finding->data_sipeka['fungsi'] ?? '';
+            $findingFungsi = trim($finding->data_sipeka['fungsi'] ?? '');
+            
+            // 1. Cek berdasarkan Master Mapping
+            $mappedValues = \App\Models\MasterFunctionMapping::getSipekaValues($this->fungsi);
+            foreach ($mappedValues as $val) {
+                if (strtolower(trim($val)) === strtolower($findingFungsi)) {
+                    return true;
+                }
+            }
+
+            // 2. Fallback pencocokan teks kasar (jika mapping belum lengkap)
             return stripos($findingFungsi, $this->fungsi) !== false;
         }
 

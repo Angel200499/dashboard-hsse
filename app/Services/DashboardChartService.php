@@ -344,6 +344,174 @@ class DashboardChartService
     }
 
     // -----------------------------------------------------------------
+    // REKAP PELAPOR — Business Support
+    // -----------------------------------------------------------------
+
+    /**
+     * Rekap pelapor temuan Business Support.
+     *
+     * Menggunakan Master Mapping untuk menentukan fungsi_sipeka yang termasuk
+     * Business Support — tidak ada hardcoded LIKE.
+     *
+     * Filter tanggal berbasis data_sipeka->tanggal (bukan created_at database),
+     * agar import dari Excel dengan tanggal lama tetap difilter dengan benar.
+     *
+     * @param  string $periode   '' | '1_day' | '3_days' | '1_week' | '1_month' | 'per_bulan'
+     * @param  int    $bulan     1-12, digunakan jika $periode === 'per_bulan'
+     * @param  int    $tahun     4-digit year, digunakan jika $periode === 'per_bulan'
+     * @param  string $search    Nama pelapor untuk filter (case-insensitive, partial match)
+     * @return array
+     */
+    public function getBusinessSupportReporterRecap(
+        string $periode = '',
+        int $bulan = 0,
+        int $tahun = 0,
+        string $search = ''
+    ): array {
+        // 1. Scope fungsi via Master Mapping (tidak hardcode)
+        $sipValues = MasterFunctionMapping::getSipekaValues('Business Support');
+
+        $query = SipekaFinding::query();
+
+        if (!empty($sipValues)) {
+            $query->whereIn(
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                $sipValues
+            );
+        } else {
+            // Fallback sementara: mapping belum diinput
+            $query->where('data_sipeka->fungsi', 'like', '%Business Support%');
+        }
+
+        // 2. Filter periode berdasarkan data_sipeka->tanggal
+        $this->applyRekapPeriodeFilter($query, $periode, $bulan, $tahun);
+
+        // 3. Filter nama pelapor (WHERE sebelum GROUP BY, pada kolom JSON)
+        //    Menggunakan WHERE pada kolom source agar index dapat digunakan
+        if (!empty(trim($search))) {
+            $query->whereRaw(
+                "TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))) LIKE ?",
+                ['%' . trim($search) . '%']
+            );
+        }
+
+        // 4. Query GROUP BY pelapor + COUNT DISTINCT id_temuan
+        //    COALESCE agar pelapor null/kosong muncul sebagai "Tidak Diketahui"
+        $rows = $query
+            ->selectRaw("
+                COALESCE(
+                    NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), ''),
+                    'Tidak Diketahui'
+                ) AS pelapor,
+                COUNT(DISTINCT id_temuan) AS jumlah
+            ")
+            ->groupBy(DB::raw("
+                COALESCE(
+                    NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), ''),
+                    'Tidak Diketahui'
+                )
+            "))
+            ->orderByDesc('jumlah')
+            ->orderBy(DB::raw("
+                COALESCE(
+                    NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), ''),
+                    'Tidak Diketahui'
+                )
+            "), 'asc')
+            ->get();
+
+        $rekap          = $rows->map(fn ($r) => ['pelapor' => $r->pelapor, 'jumlah' => (int) $r->jumlah])->all();
+        $totalPelaporan = array_sum(array_column($rekap, 'jumlah'));
+        $totalPelapor   = count($rekap);
+
+        $pelapor_terbanyak = !empty($rekap)
+            ? ['nama' => $rekap[0]['pelapor'], 'jumlah' => $rekap[0]['jumlah']]
+            : ['nama' => '-', 'jumlah' => 0];
+
+        return [
+            'rekap'             => $rekap,
+            'total_pelaporan'   => $totalPelaporan,
+            'total_pelapor'     => $totalPelapor,
+            'pelapor_terbanyak' => $pelapor_terbanyak,
+            'periode_label'     => $this->buildPeriodeLabel($periode, $bulan, $tahun),
+        ];
+    }
+
+    /**
+     * Terapkan filter periode ke query berdasarkan data_sipeka->tanggal.
+     *
+     * Format tanggal di SIPEKA bervariasi, sehingga:
+     * - Filter relatif (1_day, dll.) menggunakan Carbon + STR_TO_DATE (dengan fallback LIKE)
+     * - Filter per_bulan menggunakan LIKE '%YYYY-MM%' dan '%MM/YYYY%'
+     */
+    private function applyRekapPeriodeFilter($query, string $periode, int $bulan, int $tahun): void
+    {
+        if (empty($periode)) {
+            return; // Semua Waktu — tanpa filter tanggal
+        }
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        if ($periode === 'per_bulan' && $bulan >= 1 && $bulan <= 12 && $tahun >= 2000) {
+            // Gunakan LIKE untuk mencocokkan format 'YYYY-MM' atau 'DD/MM/YYYY' dll.
+            $paddedBulan = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+            $query->where(function ($q) use ($tanggalCol, $tahun, $paddedBulan) {
+                // Format: "2026-01-..." atau "2026-01 ..."
+                $q->whereRaw("{$tanggalCol} LIKE ?", ["{$tahun}-{$paddedBulan}%"])
+                  ->orWhereRaw("{$tanggalCol} LIKE ?", ["%/{$tahun} {$paddedBulan}%"])
+                  ->orWhereRaw("{$tanggalCol} LIKE ?", ["%{$paddedBulan}/{$tahun}%"]);
+            });
+            return;
+        }
+
+        // Filter relatif: gunakan Carbon untuk batas bawah tanggal
+        $cutoff = match ($periode) {
+            '1_day'   => now()->subDay(),
+            '3_days'  => now()->subDays(3),
+            '1_week'  => now()->subWeek(),
+            '1_month' => now()->subMonth(),
+            default   => null,
+        };
+
+        if ($cutoff) {
+            // STR_TO_DATE agar bisa dibandingkan — format SIPEKA: "YYYY-MM-DD HH:MM"
+            $query->whereRaw(
+                "STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i') >= ?",
+                [$cutoff->format('Y-m-d H:i:s')]
+            );
+        }
+    }
+
+    /**
+     * Bangun label periode untuk ditampilkan di dashboard dan PDF.
+     */
+    private function buildPeriodeLabel(string $periode, int $bulan, int $tahun): string
+    {
+        if (empty($periode)) {
+            return 'Semua Waktu';
+        }
+
+        if ($periode === 'per_bulan') {
+            $namaBulan = [
+                1  => 'Januari', 2  => 'Februari', 3  => 'Maret',
+                4  => 'April',   5  => 'Mei',       6  => 'Juni',
+                7  => 'Juli',    8  => 'Agustus',   9  => 'September',
+                10 => 'Oktober', 11 => 'November',  12 => 'Desember',
+            ];
+            $nb = $namaBulan[$bulan] ?? "Bulan {$bulan}";
+            return "{$nb} {$tahun}";
+        }
+
+        return match ($periode) {
+            '1_day'   => '1 Hari Terakhir',
+            '3_days'  => '3 Hari Terakhir',
+            '1_week'  => '1 Minggu Terakhir',
+            '1_month' => '1 Bulan Terakhir',
+            default   => 'Semua Waktu',
+        };
+    }
+
+    // -----------------------------------------------------------------
     // BASE QUERY HELPER
     // -----------------------------------------------------------------
 
