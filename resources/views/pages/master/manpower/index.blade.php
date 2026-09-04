@@ -12,7 +12,7 @@
         <div>
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Master Data Manpower</h1>
             <p class="text-sm text-slate-500 mt-1">
-                Kelola jumlah manpower per fungsi dan tahun sebagai dasar perhitungan Reporting Rate.
+                Kelola jumlah manpower per fungsi, tahun, dan bulan sebagai dasar perhitungan Reporting Rate bulanan.
             </p>
         </div>
         <button
@@ -26,27 +26,6 @@
             Tambah Manpower
         </button>
     </div>
-
-    {{-- ================================================================
-         FLASH MESSAGES (success/error)
-    ================================================================ --}}
-    @if(session('success'))
-        <div class="p-4 bg-green-50 text-green-700 rounded-lg border border-green-200 flex items-center gap-2">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-center gap-2">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            {{ session('error') }}
-        </div>
-    @endif
 
     @if($errors->any())
         <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -64,7 +43,7 @@
     @endif
 
     {{-- ================================================================
-         SUMMARY CARDS
+         SUMMARY CARDS — tampilkan data per fungsi untuk filter aktif
     ================================================================ --}}
     @php
         $fungsiColors = [
@@ -79,6 +58,12 @@
             'HSSE'            => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
             'Business Support'=> 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
         ];
+        // Label periode untuk summary cards
+        $periodeLabel = $selectedYear
+            ? ($selectedMonth
+                ? ($bulanLabels[$selectedMonth] . ' ' . $selectedYear)
+                : 'Tahun ' . $selectedYear)
+            : 'Semua Periode';
     @endphp
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -106,9 +91,11 @@
                 {{ $fnData ? number_format($fnData->jumlah_manpower) : '—' }}
             </p>
             @if($fnData)
-                <p class="text-[10px] text-slate-400 mt-0.5">Tahun {{ $fnData->tahun }}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">
+                    {{ $bulanLabels[$fnData->bulan] ?? '—' }} {{ $fnData->tahun }}
+                </p>
             @else
-                <p class="text-[10px] text-slate-400 mt-0.5">Tambahkan data</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">{{ $periodeLabel }}</p>
             @endif
         </div>
         @endforeach
@@ -120,30 +107,56 @@
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 
         {{-- Filter Bar --}}
-        <div class="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-                <h2 class="text-base font-semibold text-slate-800">Daftar Data Manpower</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Total {{ $manpowers->count() }} record{{ $selectedYear ? ' untuk tahun '.$selectedYear : '' }}</p>
-            </div>
+        <div class="px-5 py-4 border-b border-slate-100">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-800">Daftar Data Manpower</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        Total {{ $manpowers->count() }} record
+                        @if($selectedYear && $selectedMonth)
+                            untuk {{ $bulanLabels[$selectedMonth] }} {{ $selectedYear }}
+                        @elseif($selectedYear)
+                            untuk tahun {{ $selectedYear }}
+                        @endif
+                    </p>
+                </div>
 
-            {{-- Filter Tahun --}}
-            <form method="GET" action="{{ route('master.manpower.index') }}" class="flex items-center gap-2">
-                <label for="filter-tahun" class="text-sm text-slate-600 font-medium whitespace-nowrap">Tahun:</label>
-                <select
-                    id="filter-tahun"
-                    name="tahun"
-                    onchange="this.form.submit()"
-                    class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#9DBF2A]/50 focus:border-[#9DBF2A] transition"
-                >
-                    <option value="">Semua Tahun</option>
-                    @foreach($availYears as $yr)
-                        <option value="{{ $yr }}" {{ $selectedYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
-                    @endforeach
-                </select>
-                @if($selectedYear)
-                    <a href="{{ route('master.manpower.index') }}" class="text-xs text-slate-500 hover:text-slate-700 underline ml-1">Reset</a>
-                @endif
-            </form>
+                {{-- Filter Tahun + Bulan --}}
+                <form method="GET" action="{{ route('master.manpower.index') }}" class="flex flex-wrap items-center gap-2" id="filter-form">
+                    <label class="text-sm text-slate-600 font-medium whitespace-nowrap">Filter:</label>
+
+                    {{-- Filter Tahun --}}
+                    <select
+                        id="filter-tahun"
+                        name="tahun"
+                        onchange="document.getElementById('filter-bulan').value=''; this.form.submit()"
+                        class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#9DBF2A]/50 focus:border-[#9DBF2A] transition"
+                    >
+                        <option value="">Semua Tahun</option>
+                        @foreach($availYears as $yr)
+                            <option value="{{ $yr }}" {{ $selectedYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                        @endforeach
+                    </select>
+
+                    {{-- Filter Bulan (hanya aktif jika tahun dipilih) --}}
+                    <select
+                        id="filter-bulan"
+                        name="bulan"
+                        onchange="this.form.submit()"
+                        class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#9DBF2A]/50 focus:border-[#9DBF2A] transition {{ !$selectedYear ? 'opacity-50' : '' }}"
+                        {{ !$selectedYear ? 'disabled' : '' }}
+                    >
+                        <option value="">Semua Bulan</option>
+                        @foreach($bulanLabels as $num => $nama)
+                            <option value="{{ $num }}" {{ $selectedMonth == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                        @endforeach
+                    </select>
+
+                    @if($selectedYear || $selectedMonth)
+                        <a href="{{ route('master.manpower.index') }}" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset</a>
+                    @endif
+                </form>
+            </div>
         </div>
 
         {{-- TABLE --}}
@@ -157,7 +170,7 @@
                 </div>
                 <h3 class="text-base font-semibold text-slate-700 mb-1">Belum ada data manpower</h3>
                 <p class="text-sm text-slate-400 mb-6 max-w-sm">
-                    Tambahkan data manpower untuk mulai menyediakan denominator perhitungan Reporting Rate.
+                    Tambahkan data manpower per fungsi, tahun, dan bulan untuk menyediakan denominator perhitungan Reporting Rate.
                 </p>
                 <button
                     id="btn-open-create-empty"
@@ -177,6 +190,7 @@
                         <tr class="bg-slate-50 border-b border-slate-100">
                             <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Fungsi</th>
                             <th class="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Tahun</th>
+                            <th class="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Bulan</th>
                             <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Jumlah Manpower</th>
                             <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Terakhir Diperbarui</th>
                             <th class="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Aksi</th>
@@ -186,6 +200,7 @@
                         @foreach($manpowers as $mp)
                         @php
                             $badge = $fungsiColors[$mp->fungsi] ?? 'bg-slate-100 border-slate-200 text-slate-700';
+                            $namaBulan = $mp->bulan ? ($bulanLabels[$mp->bulan] ?? "Bulan {$mp->bulan}") : '—';
                         @endphp
                         <tr class="hover:bg-slate-50/60 transition-colors group">
                             <td class="px-5 py-3.5">
@@ -195,6 +210,15 @@
                             </td>
                             <td class="px-5 py-3.5 text-center">
                                 <span class="text-sm font-semibold text-slate-700">{{ $mp->tahun }}</span>
+                            </td>
+                            <td class="px-5 py-3.5 text-center">
+                                @if($mp->bulan)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                        {{ $namaBulan }}
+                                    </span>
+                                @else
+                                    <span class="text-xs text-slate-400 italic">Data lama</span>
+                                @endif
                             </td>
                             <td class="px-5 py-3.5 text-right">
                                 <span class="text-sm font-bold text-slate-800">{{ number_format($mp->jumlah_manpower) }}</span>
@@ -213,6 +237,7 @@
                                         data-id="{{ $mp->id }}"
                                         data-fungsi="{{ $mp->fungsi }}"
                                         data-tahun="{{ $mp->tahun }}"
+                                        data-bulan="{{ $mp->bulan }}"
                                         data-jumlah="{{ $mp->jumlah_manpower }}"
                                     >
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -226,7 +251,7 @@
                                         method="POST"
                                         action="{{ route('master.manpower.destroy', $mp->id) }}"
                                         class="form-delete"
-                                        data-label="{{ $mp->fungsi }} tahun {{ $mp->tahun }}"
+                                        data-label="{{ $mp->fungsi }} {{ $namaBulan }} {{ $mp->tahun }}"
                                     >
                                         @csrf
                                         @method('DELETE')
@@ -267,7 +292,7 @@
             <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                 <div>
                     <h3 class="text-lg font-semibold text-slate-800">Tambah Data Manpower</h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Masukkan data manpower per fungsi dan tahun</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Masukkan data manpower per fungsi, tahun, dan bulan</p>
                 </div>
                 <button type="button" id="btn-close-create" class="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -294,7 +319,7 @@
                         >
                             <option value="" disabled selected>— Pilih Fungsi —</option>
                             @foreach($fungsiList as $fn)
-                                <option value="{{ $fn }}">{{ $fn }}</option>
+                                <option value="{{ $fn }}" {{ old('fungsi') == $fn ? 'selected' : '' }}>{{ $fn }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -311,10 +336,29 @@
                             min="2020"
                             max="2050"
                             placeholder="Contoh: {{ now()->year }}"
+                            value="{{ old('tahun') }}"
                             required
                             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#9DBF2A]/50 focus:border-[#9DBF2A] transition"
                         >
                         <p class="text-xs text-slate-400 mt-1">Rentang tahun: 2020 – 2050</p>
+                    </div>
+
+                    {{-- Bulan --}}
+                    <div>
+                        <label for="create-bulan" class="block text-sm font-medium text-slate-700 mb-1.5">
+                            Bulan <span class="text-red-500">*</span>
+                        </label>
+                        <select
+                            id="create-bulan"
+                            name="bulan"
+                            required
+                            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#9DBF2A]/50 focus:border-[#9DBF2A] transition"
+                        >
+                            <option value="" disabled selected>— Pilih Bulan —</option>
+                            @foreach($bulanLabels as $num => $nama)
+                                <option value="{{ $num }}" {{ old('bulan') == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     {{-- Jumlah Manpower --}}
@@ -329,6 +373,7 @@
                             min="1"
                             step="1"
                             placeholder="Contoh: 100"
+                            value="{{ old('jumlah_manpower') }}"
                             required
                             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#9DBF2A]/50 focus:border-[#9DBF2A] transition"
                         >
@@ -414,6 +459,24 @@
                             class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#9DBF2A]/50 focus:border-[#9DBF2A] transition"
                         >
                         <p class="text-xs text-slate-400 mt-1">Rentang tahun: 2020 – 2050</p>
+                    </div>
+
+                    {{-- Bulan --}}
+                    <div>
+                        <label for="edit-bulan" class="block text-sm font-medium text-slate-700 mb-1.5">
+                            Bulan <span class="text-red-500">*</span>
+                        </label>
+                        <select
+                            id="edit-bulan"
+                            name="bulan"
+                            required
+                            class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#9DBF2A]/50 focus:border-[#9DBF2A] transition"
+                        >
+                            <option value="" disabled>— Pilih Bulan —</option>
+                            @foreach($bulanLabels as $num => $nama)
+                                <option value="{{ $num }}">{{ $nama }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     {{-- Jumlah Manpower --}}
@@ -524,6 +587,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const formEdit      = document.getElementById('form-edit');
     const editFungsi    = document.getElementById('edit-fungsi');
     const editTahun     = document.getElementById('edit-tahun');
+    const editBulan     = document.getElementById('edit-bulan');
     const editJumlah    = document.getElementById('edit-jumlah');
 
     function closeEditModal() { closeModal('modal-edit'); }
@@ -538,6 +602,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const id     = this.dataset.id;
             const fungsi = this.dataset.fungsi;
             const tahun  = this.dataset.tahun;
+            const bulan  = this.dataset.bulan;
             const jumlah = this.dataset.jumlah;
 
             // Set action URL dengan ID record yang benar
@@ -547,6 +612,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Isi field
             editFungsi.value = fungsi;
             editTahun.value  = tahun;
+            editBulan.value  = bulan || '';
             editJumlah.value = jumlah;
 
             openModal('modal-edit');
@@ -596,14 +662,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     @if($errors->any() && old('_method') === 'PUT')
         // Re-open edit modal jika ada error dari update
-        // Cari record berdasarkan data lama
         const oldFungsi = "{{ old('fungsi') }}";
         const oldTahun  = "{{ old('tahun') }}";
+        const oldBulan  = "{{ old('bulan') }}";
         const oldJumlah = "{{ old('jumlah_manpower') }}";
 
-        // Cari tombol edit yang cocok
+        // Cari tombol edit yang cocok berdasarkan fungsi + tahun + bulan
         document.querySelectorAll('.btn-edit').forEach(function (btn) {
-            if (btn.dataset.fungsi === oldFungsi && btn.dataset.tahun === oldTahun) {
+            if (btn.dataset.fungsi === oldFungsi
+                && btn.dataset.tahun === oldTahun
+                && btn.dataset.bulan === oldBulan) {
                 btn.click();
                 editJumlah.value = oldJumlah;
             }

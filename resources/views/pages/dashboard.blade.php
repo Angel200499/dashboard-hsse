@@ -30,6 +30,55 @@
         </div>
     </div>
 
+    <!-- ================================================================
+         FILTER BAR — Tahun + Bulan (berlaku untuk SEMUA ROLE)
+    ================================================================ -->
+    @php
+        $bulanNamaList = [
+            1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April',
+            5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus',
+            9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
+        ];
+        $tahunList = range(now()->year + 1, 2020);
+    @endphp
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm px-5 py-4">
+        <form action="" method="GET" class="flex flex-wrap items-center gap-3" id="global-filter-form">
+            <span class="text-sm font-semibold text-slate-500 mr-1">Filter:</span>
+
+            <select name="year" id="year-filter"
+                onchange="document.getElementById('month-filter').value=''; this.form.submit()"
+                class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
+                <option value="">Semua Tahun</option>
+                @foreach($tahunList as $yr)
+                    <option value="{{ $yr }}" {{ ($selectedYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                @endforeach
+            </select>
+
+            <select name="month" id="month-filter"
+                onchange="this.form.submit()"
+                class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm {{ !($selectedYear ?? null) ? 'opacity-50' : '' }}"
+                {{ !($selectedYear ?? null) ? 'disabled' : '' }}>
+                <option value="">Semua Bulan</option>
+                @foreach($bulanNamaList as $num => $nama)
+                    <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                @endforeach
+            </select>
+
+            @if(($selectedYear ?? null) || ($selectedMonth ?? null))
+                <a href="{{ route('dashboard') }}" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter</a>
+            @endif
+
+            @if($selectedYear ?? null)
+                <span class="text-xs text-slate-400 ml-2">
+                    Menampilkan data tahun {{ $selectedYear }}
+                    @if($selectedMonth ?? null)
+                        — Reporting Rate: Januari–{{ $bulanNamaList[$selectedMonth] }}
+                    @endif
+                </span>
+            @endif
+        </form>
+    </div>
+
     <!-- KPI Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <!-- Card 1: Total Temuan -->
@@ -142,11 +191,115 @@
             </div>
         </div>
 
-        <!-- Chart 2: Reporting Rate (Horizontal Bar) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">2. Reporting Rate per Fungsi</h3>
+        {{-- ================================================================
+             CHART 2a — REPORTING RATE AREA LHD (NEW — PR 1)
+             Ditempatkan DI ATAS Reporting Rate per Fungsi
+        ================================================================ --}}
+        @php
+            $lhd = $charts['reporting_lhd'] ?? ['aktif' => false];
+        @endphp
+        <div class="lg:col-span-2 bg-gradient-to-br from-[#002060] to-[#003090] rounded-2xl border border-[#001540] shadow-[0_4px_20px_-4px_rgba(0,32,96,0.4)] overflow-hidden">
+            <div class="px-6 py-5">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <!-- Judul & info -->
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-widest text-blue-300 mb-1">Area LHD — Seluruh Fungsi</p>
+                        <h3 class="text-xl font-bold text-white">Reporting Rate Area LHD</h3>
+                        @if($lhd['aktif'] && ($selectedMonth ?? null))
+                            <p class="text-sm text-blue-200 mt-1">Periode: {{ $lhd['periode_label'] ?? '' }}</p>
+                        @elseif(!($selectedYear ?? null))
+                            <p class="text-sm text-blue-300 mt-1">Pilih Tahun dan Bulan untuk melihat Reporting Rate.</p>
+                        @elseif(!($selectedMonth ?? null))
+                            <p class="text-sm text-blue-300 mt-1">Pilih Bulan untuk menghitung Reporting Rate YTD.</p>
+                        @endif
+                    </div>
+
+                    <!-- Nilai Rate -->
+                    <div class="flex items-center gap-6">
+                        @if($lhd['aktif'])
+                            @if($lhd['tersedia'] && $lhd['rate'] !== null)
+                                <div class="text-center">
+                                    <p class="text-5xl font-black text-white">{{ number_format($lhd['rate'], 2) }}<span class="text-2xl font-bold text-blue-300">%</span></p>
+                                    <p class="text-xs text-blue-300 mt-1">Reporting Rate</p>
+                                </div>
+                                <div class="hidden md:block h-16 w-px bg-blue-700"></div>
+                                <div class="grid grid-cols-3 gap-4 text-center">
+                                    <div>
+                                        <p class="text-2xl font-bold text-white">{{ number_format($lhd['total_temuan']) }}</p>
+                                        <p class="text-xs text-blue-300">Total Temuan YTD</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-2xl font-bold text-white">{{ number_format($lhd['total_manpower']) }}</p>
+                                        <p class="text-xs text-blue-300">Total Manpower</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-2xl font-bold text-white">{{ $lhd['jumlah_bulan'] }}</p>
+                                        <p class="text-xs text-blue-300">Bulan</p>
+                                    </div>
+                                </div>
+                                <div class="hidden md:block">
+                                    <p class="text-xs text-blue-300 font-mono bg-blue-900/50 rounded-lg px-3 py-2 whitespace-nowrap">
+                                        {{ number_format($lhd['total_temuan']) }} ÷ ({{ number_format($lhd['total_manpower']) }} × {{ $lhd['jumlah_bulan'] }}) × 100
+                                    </p>
+                                </div>
+                            @else
+                                <div class="bg-amber-500/20 border border-amber-400/30 rounded-xl px-5 py-3">
+                                    <p class="text-amber-300 font-semibold text-sm">⚠️ Data manpower untuk periode ini belum tersedia.</p>
+                                    <p class="text-amber-200 text-xs mt-1">Reporting Rate belum dapat dihitung. Pastikan data manpower sudah diinput untuk bulan yang dipilih.</p>
+                                </div>
+                            @endif
+                        @else
+                            <div class="text-center text-blue-300">
+                                <svg class="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <p class="text-sm">Pilih <strong>Tahun</strong> dan <strong>Bulan</strong> di atas untuk menampilkan Reporting Rate Area LHD.</p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart 2b: Reporting Rate per Fungsi (Horizontal Bar) -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[380px]">
+            @php
+                $rrMode   = $charts['reporting']['mode'] ?? 'distribusi';
+                $rrLabel  = $rrMode === 'manpower_rasio'
+                    ? '2. Reporting Rate per Fungsi (' . ($charts['reporting']['periode_label'] ?? '') . ')'
+                    : '2. Reporting Rate per Fungsi';
+                $rrData   = $charts['reporting']['data'] ?? [];
+                $hasNull  = in_array(null, $rrData, true);
+            @endphp
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-base font-bold text-slate-800">{{ $rrLabel }}</h3>
+                @if($rrMode === 'manpower_rasio')
+                    <span class="text-xs font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">temuan YTD ÷ (manpower × bulan) × 100</span>
+                @endif
+            </div>
+            @if($rrMode === 'manpower_rasio' && $hasNull)
+                <p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mb-2">
+                    ⚠️ Beberapa fungsi tidak memiliki data manpower untuk periode ini. Reporting Rate hanya ditampilkan untuk fungsi yang memiliki data manpower.
+                </p>
+            @endif
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart2"></canvas>
+            </div>
+        </div>
+
+        {{-- ================================================================
+             CHART TRENDING TEMUAN (NEW — PR 3) — full width
+        ================================================================ --}}
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[380px]">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Trending Temuan{{ ($selectedYear ?? null) ? ' ' . $selectedYear : '' }}</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Jumlah temuan per bulan sepanjang tahun {{ ($selectedYear ?? null) ? $selectedYear : 'yang dipilih' }}. Dropdown bulan tidak memengaruhi grafik ini.</p>
+                </div>
+                @if(!($selectedYear ?? null))
+                    <span class="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">Pilih tahun untuk melihat trending</span>
+                @endif
+            </div>
+            <div class="flex-1 relative w-full h-full">
+                <canvas id="chartTrending"></canvas>
             </div>
         </div>
 
@@ -267,40 +420,124 @@
         });
 
         // 2. Horizontal Bar - Reporting Rate per Fungsi
-        const rrLabels = getLabels(charts.reporting);
-        const rrValues = getValues(charts.reporting);
-        const rrBgColors = rrLabels.map(l => l === 'AREA LHD' ? '#002060' : (colors[l] || '#9CA3AF'));
+        // Hanya tampilkan fungsi yang bukan AREA LHD (LHD sudah di card terpisah)
+        // dan yang memiliki data (bukan null)
+        const rrAllData = charts.reporting.data || {};
+        const rrMode    = charts.reporting.mode || 'distribusi';
         
-        new Chart(document.getElementById('chart2'), {
-            type: 'bar',
-            data: { 
-                labels: rrLabels, 
-                datasets: [{ data: rrValues, backgroundColor: rrBgColors }] 
-            },
-            options: { 
-                ...commonOptions, 
-                indexAxis: 'y', 
-                plugins: { legend: { display: false } },
-                scales: { 
-                    x: { beginAtZero: true, grid: { display: false } },
-                    y: { grid: { display: false } }
-                },
-                animation: {
-                    onComplete: function() {
-                        var chartInstance = this;
-                        var ctx = chartInstance.ctx;
-                        ctx.font = Chart.helpers.fontString(12, 'normal', Chart.defaults.font.family);
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillStyle = '#333';
+        // Filter: exclude AREA LHD dari chart2 (sudah ditampilkan di card LHD)
+        // Untuk mode manpower_rasio, null = data manpower tidak tersedia
+        const rrLabels = Object.keys(rrAllData).filter(k => k !== 'AREA LHD' && rrAllData[k] !== null);
+        const rrValues = rrLabels.map(k => rrAllData[k]);
+        
+        const rrColorMap = {
+            'Operation': '#5B9BD5',
+            'Maintenance': '#ED7D31',
+            'HSSE': '#A5A5A5',
+            'Business Support': '#FFC000'
+        };
+        const rrBgColors = rrLabels.map(l => rrColorMap[l] || '#9CA3AF');
 
-                        this.data.datasets.forEach(function (dataset, i) {
-                            var meta = chartInstance.getDatasetMeta(i);
-                            meta.data.forEach(function (bar, index) {
-                                var data = dataset.data[index];
-                                ctx.fillText(data, bar.x + 5, bar.y);
+        if (rrLabels.length > 0) {
+            new Chart(document.getElementById('chart2'), {
+                type: 'bar',
+                data: { 
+                    labels: rrLabels, 
+                    datasets: [{ 
+                        data: rrValues, 
+                        backgroundColor: rrBgColors,
+                        borderRadius: 4,
+                    }] 
+                },
+                options: { 
+                    ...commonOptions, 
+                    indexAxis: 'y', 
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const val = ctx.raw;
+                                    return rrMode === 'manpower_rasio'
+                                        ? ` ${val}% (temuan YTD ÷ manpower × bulan × 100)`
+                                        : ` ${val}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: { 
+                        x: { beginAtZero: true, grid: { display: false } },
+                        y: { grid: { display: false } }
+                    },
+                    animation: {
+                        onComplete: function() {
+                            var chartInstance = this;
+                            var ctx = chartInstance.ctx;
+                            ctx.font = Chart.helpers.fontString(12, 'normal', Chart.defaults.font.family);
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillStyle = '#333';
+
+                            this.data.datasets.forEach(function (dataset, i) {
+                                var meta = chartInstance.getDatasetMeta(i);
+                                meta.data.forEach(function (bar, index) {
+                                    var data = dataset.data[index];
+                                    var label = rrMode === 'manpower_rasio' ? data + '%' : data;
+                                    ctx.fillText(label, bar.x + 5, bar.y);
+                                });
                             });
-                        });
+                        }
+                    }
+                }
+            });
+        }
+
+        // ================================================================
+        // CHART TRENDING TEMUAN (NEW — PR 3)
+        // Selalu 12 bulan, hanya mengikuti filter TAHUN (bukan bulan)
+        // ================================================================
+        const trendingData = charts.trending || {};
+        const bulanLabels  = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        // trendingData adalah {1: count, 2: count, ..., 12: count}
+        const trendingValues = bulanLabels.map((_, i) => trendingData[i + 1] || 0);
+
+        new Chart(document.getElementById('chartTrending'), {
+            type: 'line',
+            data: {
+                labels: bulanLabels,
+                datasets: [{
+                    label: 'Jumlah Temuan',
+                    data: trendingValues,
+                    borderColor: '#5AA2D7',
+                    backgroundColor: 'rgba(90, 162, 215, 0.1)',
+                    borderWidth: 2.5,
+                    pointBackgroundColor: '#5AA2D7',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    fill: true,
+                    tension: 0.35,
+                }]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} temuan`
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        ticks: {
+                            callback: (v) => v.toLocaleString('id-ID')
+                        }
                     }
                 }
             }

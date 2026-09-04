@@ -25,9 +25,17 @@ class DashboardController extends Controller
         $tahunRaw = $request->get('year');
         $tahun    = ($tahunRaw && preg_match('/^\d{4}$/', $tahunRaw)) ? (int) $tahunRaw : null;
 
+        // Validasi filter bulan (1–12) — hanya aktif jika tahun juga dipilih
+        $bulanRaw      = $request->get('month');
+        $bulan         = ($tahun && $bulanRaw && is_numeric($bulanRaw)
+                          && (int) $bulanRaw >= 1 && (int) $bulanRaw <= 12)
+                         ? (int) $bulanRaw
+                         : null;
+
         // -----------------------------------------------------------------
         // KPI — dihitung via SQL CASE WHEN (computed monitoring status)
-        // Difilter by tahun jika ada
+        // Difilter by tahun jika ada.
+        // KPI TIDAK dipengaruhi filter bulan — hanya tahun.
         // -----------------------------------------------------------------
         $baseKpi = SipekaFinding::query();
         if ($tahun) {
@@ -59,14 +67,15 @@ class DashboardController extends Controller
         ];
 
         // -----------------------------------------------------------------
-        // Charts — DashboardChartService, difilter by tahun jika ada
+        // Charts — DashboardChartService, difilter by tahun + bulan
         // $fungsi = null → Global Dashboard (semua fungsi)
         // -----------------------------------------------------------------
-        $charts = $this->chartService->getCharts(null, $tahun);
+        $charts = $this->chartService->getCharts(null, $tahun, $bulan);
 
-        // Tahun yang dipilih dikirim ke view untuk ditampilkan di filter UI
-        $selectedYear = $tahun;
+        // Filter yang dipilih dikirim ke view untuk UI
+        $selectedYear  = $tahun;
+        $selectedMonth = $bulan;
 
-        return view('pages.dashboard', compact('kpi', 'charts', 'selectedYear'));
+        return view('pages.dashboard', compact('kpi', 'charts', 'selectedYear', 'selectedMonth'));
     }
 }

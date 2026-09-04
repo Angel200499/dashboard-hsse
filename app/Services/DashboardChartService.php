@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\SipekaFinding;
 use App\Models\MasterFunctionMapping;
+use App\Models\MasterManpower;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,7 +21,10 @@ use Illuminate\Support\Facades\DB;
  * Struktur output $charts SELALU sama:
  * [
  *   'fungsi'            => [...],   // Chart 1
- *   'reporting'         => [...],   // Chart 2
+ *   'fungsi_info'       => [...],   // Panel info Chart 1
+ *   'reporting_lhd'     => [...],   // Chart 2a — Reporting Rate Area LHD (NEW)
+ *   'reporting'         => [...],   // Chart 2b — Reporting Rate per Fungsi
+ *   'trending'          => [...],   // Chart Trending Temuan (NEW)
  *   'kategori'          => [...],   // Chart 3
  *   'keterlibatan'      => [...],   // Chart 4
  *   'persentase_fungsi' => [...],   // Chart 5
@@ -28,6 +32,12 @@ use Illuminate\Support\Facades\DB;
  *   'unsafe_action'     => [...],   // Chart 7
  *   'unsafe_condition'  => [...],   // Chart 8
  * ]
+ *
+ * PENTING — ISOLASI QUERY:
+ * baseQuery() digunakan oleh Chart 1,3,4,5,6,7,8 dan KPI.
+ * chartReportingRate() dan chartReportingRateLhd() menggunakan
+ * ytdQuery() yang terpisah — jangan mengubah baseQuery() untuk
+ * keperluan Reporting Rate.
  */
 class DashboardChartService
 {
@@ -39,17 +49,22 @@ class DashboardChartService
      *
      * @param  string|null $fungsi  Jika diisi, semua chart difilter by fungsi.
      *                              Jika null, mengambil data global.
-     * @param  int|null    $tahun   Jika diisi, filter berdasarkan tahun tanggal temuan
-     *                              (dari kolom JSON data_sipeka->tanggal).
+     * @param  int|null    $tahun   Jika diisi, filter berdasarkan tahun tanggal temuan.
      *                              Jika null, semua tahun.
+     * @param  int|null    $bulan   Jika diisi, Reporting Rate menggunakan manpower bulan tersebut
+     *                              dan temuan dihitung YTD (Januari–bulan).
+     *                              Chart lain (Kategori PEKA, Unsafe, dll.) TIDAK terpengaruh.
+     *                              Jika null, Reporting Rate menampilkan mode distribusi.
      * @return array
      */
-    public function getCharts(?string $fungsi = null, ?int $tahun = null): array
+    public function getCharts(?string $fungsi = null, ?int $tahun = null, ?int $bulan = null): array
     {
         return [
             'fungsi'            => $this->chartJumlahPerFungsi($fungsi, $tahun),
             'fungsi_info'       => $this->chartFungsiInfo($fungsi, $tahun),
-            'reporting'         => $this->chartReportingRate($fungsi, $tahun),
+            'reporting_lhd'     => $this->chartReportingRateLhd($tahun, $bulan),
+            'reporting'         => $this->chartReportingRate($fungsi, $tahun, $bulan),
+            'trending'          => $this->chartTrendingTemuan($fungsi, $tahun),
             'kategori'          => $this->chartKategoriPeka($fungsi, $tahun),
             'keterlibatan'      => $this->chartKeterlibatan($fungsi, $tahun),
             'persentase_fungsi' => $this->chartPersentaseFungsi($fungsi, $tahun),
@@ -117,35 +132,231 @@ class DashboardChartService
     }
 
     /**
-     * Chart 2 — Reporting Rate per Fungsi (Horizontal Bar).
+     * Chart 2a — Reporting Rate Area LHD (NEW).
      *
-     * Formula: (temuan_fungsi_X / total_semua_temuan_scope) × 100
-     * Total pembagi = total dalam scope tahun yang sama (bukan global absolut).
+     * Menghitung Reporting Rate untuk seluruh area LHD (semua fungsi gabungan).
+     *
+     * Formula:
+     *   Rate = (total_temuan_Jan_sd_bulan / (total_manpower_semua_fungsi × bulan)) × 100
+     *
+     * total_manpower = jumlah manpower seluruh fungsi pada bulan yang dipilih.
+     * BUKAN jumlah kumulatif manpower per bulan.
+     *
+     * @param  int|null $tahun
+     * @param  int|null $bulan  1–12; null → mode tidak aktif
+     * @return array
      */
-    private function chartReportingRate(?string $fungsi, ?int $tahun): array
+    private function chartReportingRateLhd(?int $tahun, ?int $bulan): array
     {
-        // Total dalam scope (dengan filter tahun jika ada)
-        $totalScope = $this->baseQuery(null, $tahun)->count();
+        // Jika tidak ada tahun atau bulan yang dipilih, kembalikan mode tidak aktif
+        if (!$tahun || !$bulan) {
+            return [
+                'aktif'          => false,
+                'rate'           => null,
+                'total_temuan'   => null,
+                'total_manpower' => null,
+                'jumlah_bulan'   => null,
+                'tersedia'       => false,
+                'periode_label'  => null,
+            ];
+        }
 
-        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
-        $result      = [];
+        // 1. Hitung total temuan YTD (Januari s/d bulan terpilih, seluruh fungsi)
+        $totalTemuan = $this->ytdQuery(null, $tahun, $bulan)->count();
 
-        if ($totalScope === 0) {
-            foreach ($fungsiScope as $f) {
-                $result[$f] = 0;
+        // 2. Hitung total manpower seluruh fungsi pada bulan terpilih
+        $totalManpower = 0;
+        $manpowerTersedia = true;
+
+        foreach (self::FUNGSI_LIST as $f) {
+            $mp = MasterManpower::getManpower($tahun, $bulan, $f);
+            if ($mp === null) {
+                $manpowerTersedia = false;
+                break;
             }
-            $result['AREA LHD'] = 0;
+            $totalManpower += $mp;
+        }
+
+        // 3. Hitung rate
+        $rate = null;
+        if ($manpowerTersedia && $totalManpower > 0) {
+            $denominator = $totalManpower * $bulan;
+            $rate = round(($totalTemuan / $denominator) * 100, 2);
+        }
+
+        // 4. Label periode
+        $namaBulan = MasterManpower::BULAN_LABELS[$bulan] ?? "Bulan {$bulan}";
+        $periodeLabel = "Januari–{$namaBulan} {$tahun}";
+
+        return [
+            'aktif'          => true,
+            'rate'           => $rate,
+            'total_temuan'   => $totalTemuan,
+            'total_manpower' => $manpowerTersedia ? $totalManpower : null,
+            'jumlah_bulan'   => $bulan,
+            'tersedia'       => $manpowerTersedia,
+            'periode_label'  => $periodeLabel,
+        ];
+    }
+
+    /**
+     * Chart 2b — Reporting Rate per Fungsi (Horizontal Bar).
+     *
+     * Formula (saat bulan dipilih):
+     *   Rate_fungsi = (total_temuan_YTD_fungsi / (manpower_fungsi_bulan × bulan)) × 100
+     *
+     * Formula (saat bulan tidak dipilih / mode distribusi):
+     *   Menampilkan distribusi jumlah pelaporan per fungsi (backward compatible).
+     *
+     * PENTING:
+     *   - ytdQuery() digunakan untuk menghitung temuan YTD — terpisah dari baseQuery()
+     *   - Manpower yang digunakan adalah manpower BULAN yang dipilih (bukan kumulatif)
+     *   - Jika manpower tidak tersedia, rate = null (bukan 0)
+     */
+    private function chartReportingRate(?string $fungsi, ?int $tahun, ?int $bulan = null): array
+    {
+        $fungsiList = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+
+        // Mode: tidak ada tahun atau bulan → tampilkan distribusi lama
+        if (!$tahun || !$bulan) {
+            $data = [];
+            $sumScopeTemuan   = 0;
+            $sumScopeManpower = 0;
+
+            foreach ($fungsiList as $f) {
+                $jumlahPelaporan  = $this->baseQuery($f, $tahun)->count();
+                $sumScopeTemuan  += $jumlahPelaporan;
+
+                $mpQuery = MasterManpower::where('fungsi', $f);
+                if ($tahun) {
+                    $mpQuery->where('tahun', $tahun);
+                }
+                $manpower = (int) $mpQuery->sum('jumlah_manpower');
+                $sumScopeManpower += $manpower;
+
+                if ($manpower > 0) {
+                    $data[$f] = round($jumlahPelaporan / $manpower, 2);
+                } else {
+                    $data[$f] = 0;
+                }
+            }
+
+            // AREA LHD — hanya untuk global (fungsi = null)
+            if (!$fungsi) {
+                if ($sumScopeManpower > 0) {
+                    $data['AREA LHD'] = round($sumScopeTemuan / $sumScopeManpower, 2);
+                } else {
+                    $data['AREA LHD'] = 0;
+                }
+
+                // Urutkan: AREA LHD di atas
+                $ordered = ['AREA LHD' => $data['AREA LHD']];
+                foreach (self::FUNGSI_LIST as $f) {
+                    $ordered[$f] = $data[$f] ?? 0;
+                }
+                $data = $ordered;
+            }
+
+            return [
+                'mode'          => 'distribusi',
+                'data'          => $data,
+                'periode_label' => $tahun ? "Tahun {$tahun}" : 'Semua Waktu',
+            ];
+        }
+
+        // Mode: tahun + bulan dipilih → gunakan formula YTD dengan manpower bulanan
+        $data           = [];
+        $namaBulan      = MasterManpower::BULAN_LABELS[$bulan] ?? "Bulan {$bulan}";
+        $periodeLabel   = "Januari–{$namaBulan} {$tahun}";
+
+        foreach ($fungsiList as $f) {
+            // Temuan YTD: Januari s/d bulan terpilih
+            $totalTemuan = $this->ytdQuery($f, $tahun, $bulan)->count();
+
+            // Manpower: hanya bulan yang dipilih (bukan kumulatif)
+            $manpower = MasterManpower::getManpower($tahun, $bulan, $f);
+
+            if ($manpower === null) {
+                // Manpower tidak tersedia — jangan menghitung
+                $data[$f] = null;
+            } elseif ($manpower === 0) {
+                // Manpower nol — hindari division by zero
+                $data[$f] = null;
+            } else {
+                $denominator = $manpower * $bulan;
+                $data[$f]    = round(($totalTemuan / $denominator) * 100, 2);
+            }
+        }
+
+        // Untuk global dashboard, tambahkan AREA LHD dari chartReportingRateLhd
+        // (tidak perlu dihitung ulang di sini, sudah ada di key 'reporting_lhd')
+
+        return [
+            'mode'          => 'manpower_rasio',
+            'data'          => $data,
+            'periode_label' => $periodeLabel,
+        ];
+    }
+
+    /**
+     * Chart Trending Temuan — Line Chart 12 bulan (NEW).
+     *
+     * Menampilkan jumlah temuan per bulan sepanjang tahun yang dipilih.
+     * Selalu mengembalikan 12 elemen (Jan–Des), bulan tanpa data = 0.
+     *
+     * PENTING: Chart ini hanya mengikuti filter TAHUN, bukan filter bulan.
+     * Dropdown bulan untuk Reporting Rate tidak memengaruhi chart ini.
+     *
+     * @param  string|null $fungsi
+     * @param  int|null    $tahun   Jika null, kembalikan semua 0
+     * @return array  [1=>int, 2=>int, ..., 12=>int]
+     */
+    private function chartTrendingTemuan(?string $fungsi, ?int $tahun): array
+    {
+        // Inisialisasi 12 bulan dengan 0
+        $result = array_fill(1, 12, 0);
+
+        if (!$tahun) {
             return $result;
         }
 
-        $sumScope = 0;
-        foreach ($fungsiScope as $f) {
-            $count = $this->baseQuery($f, $tahun)->count();
-            $result[$f] = round(($count / $totalScope) * 100, 2);
-            $sumScope += $count;
+        // Query: GROUP BY bulan dari tanggal temuan
+        // Filter hanya berdasarkan tahun (bukan bulan spesifik)
+        $query = SipekaFinding::query();
+
+        // Filter fungsi jika ada
+        if ($fungsi) {
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+            if (!empty($sipValues)) {
+                $query->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
         }
 
-        $result['AREA LHD'] = round(($sumScope / $totalScope) * 100, 2);
+        // Filter tahun via LIKE pada kolom tanggal
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+        $query->whereRaw("{$tanggalCol} LIKE ?", ["%{$tahun}%"]);
+
+        // GROUP BY bulan (MONTH dari tanggal format YYYY-MM-DD HH:MM)
+        $rows = $query
+            ->selectRaw(
+                "MONTH(STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i')) as bulan_ke,
+                 COUNT(*) as total"
+            )
+            ->groupBy('bulan_ke')
+            ->orderBy('bulan_ke')
+            ->get();
+
+        foreach ($rows as $row) {
+            $bln = (int) $row->bulan_ke;
+            if ($bln >= 1 && $bln <= 12) {
+                $result[$bln] = (int) $row->total;
+            }
+        }
 
         return $result;
     }
@@ -516,16 +727,17 @@ class DashboardChartService
     // -----------------------------------------------------------------
 
     /**
-     * Base query dengan filter fungsi dan/atau tahun yang sudah diterapkan.
+     * Base query dengan filter fungsi dan tahun yang sudah diterapkan.
+     *
+     * PENTING: baseQuery() digunakan oleh Chart 1, 3, 4, 5, 6, 7, 8 dan KPI.
+     * Jangan mengubah perilaku baseQuery() untuk keperluan Reporting Rate.
+     * Gunakan ytdQuery() khusus untuk Reporting Rate.
      *
      * Filter fungsi menggunakan Master Mapping:
      *   Jika mapping tersedia → WHERE fungsi_sipeka IN (...)
      *   Jika mapping belum ada → fallback ke LIKE (behavior sebelumnya)
      *
-     * Fallback menjaga kompatibilitas saat mapping belum diinput Admin HSSE.
-     *
      * Filter tahun menggunakan kolom JSON data_sipeka->tanggal.
-     * Format tanggal di Excel SIPEKA diasumsikan mengandung tahun 4 digit (YYYY).
      *
      * @param  string|null $fungsi
      * @param  int|null    $tahun
@@ -550,14 +762,63 @@ class DashboardChartService
             }
         }
 
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
         if ($tahun) {
-            // Filter berdasarkan tahun dari kolom JSON tanggal
-            // Menggunakan LIKE '%YYYY%' karena format tanggal bisa bervariasi
+            // Filter berdasarkan tahun saja (tidak per bulan)
             $query->whereRaw(
-                "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal')) LIKE ?",
+                "{$tanggalCol} LIKE ?",
                 ["%{$tahun}%"]
             );
         }
+
+        return $query;
+    }
+
+    /**
+     * YTD Query — khusus untuk Reporting Rate.
+     *
+     * Berbeda dari baseQuery(): query ini memfilter temuan dari Januari
+     * sampai bulan yang dipilih (year-to-date / kumulatif).
+     *
+     * Digunakan oleh chartReportingRate() dan chartReportingRateLhd().
+     * JANGAN gunakan untuk chart lain agar tidak mengubah perilaku existing.
+     *
+     * @param  string|null $fungsi  null = semua fungsi (Area LHD)
+     * @param  int         $tahun
+     * @param  int         $bulan   1–12
+     */
+    private function ytdQuery(?string $fungsi, int $tahun, int $bulan)
+    {
+        $query = SipekaFinding::query();
+
+        // Filter fungsi
+        if ($fungsi) {
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+            if (!empty($sipValues)) {
+                $query->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
+        }
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        // Filter YTD: Januari (01) s/d bulan terpilih
+        // Format tanggal: 'YYYY-MM-DD HH:MM' → gunakan STR_TO_DATE untuk range
+        $startDate = "{$tahun}-01-01 00:00";
+        $endPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+        // Hitung hari terakhir bulan terpilih
+        $lastDay   = date('t', mktime(0, 0, 0, $bulan, 1, $tahun));
+        $endDate   = "{$tahun}-{$endPadded}-{$lastDay} 23:59";
+
+        $query->whereRaw(
+            "STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i') BETWEEN ? AND ?",
+            [$startDate, $endDate]
+        );
 
         return $query;
     }

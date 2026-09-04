@@ -11,27 +11,42 @@ class MasterManpowerController extends Controller
 {
     /**
      * Tampilkan daftar Master Manpower.
-     * Mendukung filter berdasarkan tahun.
+     * Mendukung filter berdasarkan tahun dan bulan.
      */
     public function index(Request $request)
     {
-        $query = MasterManpower::query()->orderBy('tahun', 'desc')->orderBy('fungsi');
+        $query = MasterManpower::query()
+            ->orderBy('tahun', 'desc')
+            ->orderBy('bulan', 'asc')
+            ->orderBy('fungsi');
 
         // Filter tahun (opsional)
         if ($request->filled('tahun') && preg_match('/^\d{4}$/', $request->tahun)) {
             $query->byTahun((int) $request->tahun);
         }
 
-        $manpowers   = $query->get();
-        $availYears  = MasterManpower::availableYears();
+        // Filter bulan (opsional, hanya berlaku jika tahun juga dipilih)
+        if ($request->filled('bulan') && is_numeric($request->bulan)
+            && (int) $request->bulan >= 1 && (int) $request->bulan <= 12) {
+            $query->byBulan((int) $request->bulan);
+        }
+
+        $manpowers    = $query->get();
+        $availYears   = MasterManpower::availableYears();
         $selectedYear = $request->filled('tahun') ? (int) $request->tahun : null;
-        $fungsiList  = MasterManpower::FUNGSI_LIST;
+        $selectedMonth = ($request->filled('bulan') && is_numeric($request->bulan))
+            ? (int) $request->bulan
+            : null;
+        $fungsiList   = MasterManpower::FUNGSI_LIST;
+        $bulanLabels  = MasterManpower::BULAN_LABELS;
 
         return view('pages.master.manpower.index', compact(
             'manpowers',
             'availYears',
             'selectedYear',
-            'fungsiList'
+            'selectedMonth',
+            'fungsiList',
+            'bulanLabels'
         ));
     }
 
@@ -44,10 +59,12 @@ class MasterManpowerController extends Controller
         MasterManpower::create([
             'fungsi'           => $request->fungsi,
             'tahun'            => $request->tahun,
+            'bulan'            => $request->bulan,
             'jumlah_manpower'  => $request->jumlah_manpower,
         ]);
 
-        return back()->with('success', 'Data manpower berhasil ditambahkan.');
+        $namaBulan = MasterManpower::namaBulan((int) $request->bulan);
+        return back()->with('success', "Data manpower {$request->fungsi} {$namaBulan} {$request->tahun} berhasil ditambahkan.");
     }
 
     /**
@@ -59,10 +76,12 @@ class MasterManpowerController extends Controller
     {
         $manpower->fungsi          = $request->fungsi;
         $manpower->tahun           = $request->tahun;
+        $manpower->bulan           = $request->bulan;
         $manpower->jumlah_manpower = $request->jumlah_manpower;
         $manpower->save();
 
-        return back()->with('success', 'Data manpower berhasil diperbarui.');
+        $namaBulan = MasterManpower::namaBulan((int) $request->bulan);
+        return back()->with('success', "Data manpower {$request->fungsi} {$namaBulan} {$request->tahun} berhasil diperbarui.");
     }
 
     /**
@@ -70,7 +89,8 @@ class MasterManpowerController extends Controller
      */
     public function destroy(MasterManpower $manpower)
     {
-        $label = "{$manpower->fungsi} tahun {$manpower->tahun}";
+        $namaBulan = MasterManpower::namaBulan($manpower->bulan);
+        $label = "{$manpower->fungsi} {$namaBulan} {$manpower->tahun}";
         $manpower->delete();
 
         return back()->with('success', "Data manpower {$label} berhasil dihapus.");

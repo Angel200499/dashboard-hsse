@@ -58,6 +58,16 @@ class DashboardFunctionController extends Controller
         $selectedYear = $tahun;
 
         // -----------------------------------------------------------------
+        // Validasi filter bulan (parameter 'month', 1-12)
+        // Hanya aktif jika tahun juga dipilih
+        // -----------------------------------------------------------------
+        $bulanRaw      = $request->get('month');
+        $bulan         = ($bulanRaw && is_numeric($bulanRaw) && (int) $bulanRaw >= 1 && (int) $bulanRaw <= 12)
+                         ? (int) $bulanRaw
+                         : null;
+        $selectedMonth = $bulan;
+
+        // -----------------------------------------------------------------
         // Mapping-aware filter helper
         // Jika mapping tersedia → whereIn; jika belum → fallback LIKE
         // -----------------------------------------------------------------
@@ -111,9 +121,10 @@ class DashboardFunctionController extends Controller
 
         // -----------------------------------------------------------------
         // Charts — DashboardChartService yang sama dengan Global Dashboard
-        // Difilter by $fungsi + $tahun → struktur $charts IDENTIK
+        // Difilter by $fungsi + $tahun + $bulan → Reporting Rate menggunakan manpower bulanan
+        // Chart lain tidak terpengaruh oleh $bulan
         // -----------------------------------------------------------------
-        $charts = $this->chartService->getCharts($fungsi, $tahun);
+        $charts = $this->chartService->getCharts($fungsi, $tahun, $bulan);
 
         // -----------------------------------------------------------------
         // Tabel — FindingQueryService
@@ -128,7 +139,8 @@ class DashboardFunctionController extends Controller
             'charts',
             'findingsPaginated',
             'fungsi',
-            'selectedYear'
+            'selectedYear',
+            'selectedMonth'
         ));
     }
 

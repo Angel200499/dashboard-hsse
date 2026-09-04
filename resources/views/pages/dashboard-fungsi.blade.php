@@ -12,7 +12,7 @@
         </div>
 
         <div class="flex items-center gap-3">
-            <form action="" method="GET" class="flex flex-wrap items-center gap-3">
+            <form action="" method="GET" class="flex flex-wrap items-center gap-3" id="dashboard-filter-form">
                 <div class="relative w-full sm:w-auto">
                     <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                         <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -34,6 +34,39 @@
                     <option value="1_week" {{ request("date_filter") == "1_week" ? "selected" : "" }}>1 Minggu Terakhir</option>
                     <option value="1_month" {{ request("date_filter") == "1_month" ? "selected" : "" }}>1 Bulan Terakhir</option>
                 </select>
+
+                {{-- ================================================
+                     FILTER TAHUN + BULAN (untuk KPI, Chart, Reporting Rate)
+                ================================================ --}}
+                @php
+                    $bulanNamaList = [
+                        1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April',
+                        5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus',
+                        9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
+                    ];
+                    $tahunList = range(now()->year + 1, 2020);
+                @endphp
+
+                <select name="year" onchange="document.getElementById('month-filter').value=''; this.form.submit()"
+                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
+                    <option value="">Semua Tahun</option>
+                    @foreach($tahunList as $yr)
+                        <option value="{{ $yr }}" {{ $selectedYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                    @endforeach
+                </select>
+
+                <select name="month" id="month-filter" onchange="this.form.submit()"
+                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm {{ !$selectedYear ? 'opacity-50' : '' }}"
+                    {{ !$selectedYear ? 'disabled' : '' }}>
+                    <option value="">Semua Bulan</option>
+                    @foreach($bulanNamaList as $num => $nama)
+                        <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                    @endforeach
+                </select>
+
+                @if($selectedYear || $selectedMonth ?? false)
+                    <a href="{{ request()->url() }}" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter</a>
+                @endif
             </form>
         </div>
     </div>
@@ -94,9 +127,31 @@
             </div>
         </div>
 
-        <!-- Chart 2: Reporting Rate (Horizontal Bar) -->
+        <!-- Chart 2: Reporting Rate per Fungsi (Horizontal Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">2. Reporting Rate per Fungsi</h3>
+            @php
+                $rrMode   = $charts['reporting']['mode'] ?? 'distribusi';
+                $rrLabel  = $rrMode === 'manpower_rasio'
+                    ? '2. Reporting Rate (' . ($charts['reporting']['periode_label'] ?? '') . ')'
+                    : '2. Reporting Rate per Fungsi';
+                $rrData   = $charts['reporting']['data'] ?? [];
+                $hasNull  = in_array(null, $rrData, true);
+            @endphp
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-base font-bold text-slate-800">{{ $rrLabel }}</h3>
+                @if($rrMode === 'manpower_rasio')
+                    <span class="text-xs font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">temuan YTD ÷ (manpower × bulan) × 100</span>
+                @endif
+            </div>
+            @if($rrMode === 'manpower_rasio' && $hasNull)
+                <p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mb-2">
+                    ⚠️ Data manpower untuk periode ini belum tersedia. Reporting Rate belum dapat dihitung.
+                </p>
+            @elseif($rrMode === 'distribusi' && ($selectedMonth ?? null))
+                <p class="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 mb-2">
+                    ℹ️ Pilih Tahun terlebih dahulu untuk mengaktifkan Reporting Rate berbasis manpower bulanan.
+                </p>
+            @endif
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart2"></canvas>
             </div>
@@ -411,10 +466,11 @@
             'Maintenance': '#ED7D31', 
             'HSSE': '#A5A5A5', 
             'Business Support': '#FFC000',
-            'Safe Action': '#5AA2D7',
-            'Safe Condition': '#ED7D31',
-            'Unsafe Action': '#A5A5A5',
-            'Unsafe Condition': '#FFC000',
+            'Tindakan aman': '#5AA2D7',
+            'Kondisi aman': '#ED7D31',
+            'Tindakan tidak aman': '#A5A5A5',
+            'Kondisi tidak aman': '#FFC000',
+            'Tidak ada temuan': '#94a3b8',
         };
 
         // Helper to get array of values and labels from assoc array
@@ -436,44 +492,71 @@
         });
 
         // 2. Horizontal Bar - Reporting Rate per Fungsi
-        const rrLabels = getLabels(charts.reporting);
-        const rrValues = getValues(charts.reporting);
-        const rrBgColors = rrLabels.map(l => l === 'AREA LHD' ? '#002060' : (colors[l] || '#9CA3AF'));
-        
-        new Chart(document.getElementById('chart2'), {
-            type: 'bar',
-            data: { 
-                labels: rrLabels, 
-                datasets: [{ data: rrValues, backgroundColor: rrBgColors }] 
-            },
-            options: { 
-                ...commonOptions, 
-                indexAxis: 'y', 
-                plugins: { legend: { display: false } },
-                scales: { 
-                    x: { beginAtZero: true, grid: { display: false } },
-                    y: { grid: { display: false } }
-                },
-                animation: {
-                    onComplete: function() {
-                        var chartInstance = this;
-                        var ctx = chartInstance.ctx;
-                        ctx.font = Chart.helpers.fontString(12, 'normal', Chart.defaults.font.family);
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillStyle = '#333';
+        const rrChart   = charts.reporting || {};
+        const rrRawData = rrChart.data || {};
+        const rrMode    = rrChart.mode || 'distribusi';
 
-                        this.data.datasets.forEach(function (dataset, i) {
-                            var meta = chartInstance.getDatasetMeta(i);
-                            meta.data.forEach(function (bar, index) {
-                                var data = dataset.data[index];
-                                ctx.fillText(data, bar.x + 5, bar.y);
+        // Filter null values (manpower tidak tersedia) dan exclude AREA LHD
+        const rrLabels   = Object.keys(rrRawData).filter(k => k !== 'AREA LHD' && rrRawData[k] !== null);
+        const rrValues   = rrLabels.map(k => rrRawData[k]);
+
+        const rrColorMap = {
+            'Operation': '#5B9BD5',
+            'Maintenance': '#ED7D31',
+            'HSSE': '#A5A5A5',
+            'Business Support': '#FFC000'
+        };
+        const rrBgColors = rrLabels.map(l => rrColorMap[l] || '#9CA3AF');
+
+        if (rrLabels.length > 0) {
+            new Chart(document.getElementById('chart2'), {
+                type: 'bar',
+                data: { 
+                    labels: rrLabels, 
+                    datasets: [{ data: rrValues, backgroundColor: rrBgColors, borderRadius: 4 }] 
+                },
+                options: { 
+                    ...commonOptions, 
+                    indexAxis: 'y', 
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const val = ctx.raw;
+                                    return rrMode === 'manpower_rasio'
+                                        ? ` ${val}% (temuan YTD ÷ manpower × bulan × 100)`
+                                        : ` ${val}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: { 
+                        x: { beginAtZero: true, grid: { display: false } },
+                        y: { grid: { display: false } }
+                    },
+                    animation: {
+                        onComplete: function() {
+                            var chartInstance = this;
+                            var ctx = chartInstance.ctx;
+                            ctx.font = Chart.helpers.fontString(12, 'normal', Chart.defaults.font.family);
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillStyle = '#333';
+
+                            this.data.datasets.forEach(function (dataset, i) {
+                                var meta = chartInstance.getDatasetMeta(i);
+                                meta.data.forEach(function (bar, index) {
+                                    var data = dataset.data[index];
+                                    var label = rrMode === 'manpower_rasio' ? data + '%' : data;
+                                    ctx.fillText(label, bar.x + 5, bar.y);
+                                });
                             });
-                        });
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
 
         // 3. Pie Chart - Kategori PEKA
         new Chart(document.getElementById('chart3'), {
