@@ -14,12 +14,23 @@ class MasterFunctionMapping extends Model
     /**
      * 4 fungsi utama Dashboard HSSE.
      * Digunakan di validasi, dropdown, dan label.
+     * JANGAN ditambah 'GM' — GM bukan fungsi dashboard.
      */
     public const DASHBOARD_FUNGSI_LIST = [
         'Operation',
         'Maintenance',
         'HSSE',
         'Business Support',
+    ];
+
+    /**
+     * Daftar nilai kelompok khusus yang valid.
+     * Kelompok khusus berbeda dari fungsi dashboard:
+     *   - Fungsi dashboard: menentukan di mana temuan tampil di dashboard fungsi
+     *   - Kelompok khusus: identifikasi tambahan (misal GM) tanpa memengaruhi 4 fungsi utama
+     */
+    public const KELOMPOK_KHUSUS_LIST = [
+        'GM',
     ];
 
     /**
@@ -30,6 +41,7 @@ class MasterFunctionMapping extends Model
     protected $fillable = [
         'fungsi_sipeka',
         'fungsi_dashboard',
+        'kelompok_khusus',
     ];
 
     // -----------------------------------------------------------------
@@ -69,6 +81,25 @@ class MasterFunctionMapping extends Model
     }
 
     /**
+     * Kembalikan seluruh nilai fungsi_sipeka yang dipetakan ke kelompok khusus GM.
+     *
+     * Digunakan untuk kebutuhan Dashboard GM di masa mendatang.
+     * Metode ini TIDAK memengaruhi getSipekaValues() maupun 4 fungsi dashboard utama.
+     *
+     * Contoh:
+     *   getGmSipekaValues()
+     *   → ['Area Lahendong']
+     *
+     * @return array<int, string> Array nilai fungsi_sipeka dengan kelompok_khusus = 'GM'
+     */
+    public static function getGmSipekaValues(): array
+    {
+        return static::where('kelompok_khusus', 'GM')
+            ->pluck('fungsi_sipeka')
+            ->toArray();
+    }
+
+    /**
      * Kembalikan daftar nilai FUNGSI dari sipeka_findings yang belum memiliki mapping.
      *
      * Query ini HANYA membaca data — tidak mengubah sipeka_findings sama sekali.
@@ -95,8 +126,10 @@ class MasterFunctionMapping extends Model
             ->filter(fn ($v) => !is_null($v) && trim($v) !== '') // hapus null & kosong
             ->values();
 
-        // Semua fungsi_sipeka yang sudah dipetakan — lowercase untuk perbandingan
-        // Case-insensitive: agar "OPERATION" dan "Operation" dianggap sama
+        // Semua fungsi_sipeka yang sudah dipetakan — lowercase untuk perbandingan.
+        // Catatan: record dengan kelompok_khusus = 'GM' (dan fungsi_dashboard = NULL) juga
+        // dianggap sudah dipetakan, sehingga tidak muncul sebagai unmapped.
+        // Case-insensitive: agar "OPERATION" dan "Operation" dianggap sama.
         $mappedLower = static::pluck('fungsi_sipeka')
             ->map(fn ($v) => strtolower(trim($v)))
             ->toArray();

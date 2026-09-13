@@ -146,7 +146,7 @@
                         @foreach($fi['breakdown'] as $namaFungsi => $jumlah)
                             @if($jumlah > 0)
                             @php
-                                $pct = $fi['total'] > 0 ? round($jumlah / $fi['total'] * 100, 1) : 0;
+                                $pct = $fi['total'] > 0 ? number_format(($jumlah / $fi['total'] * 100), 2, ',', '.') : '0,00';
                                 $warna = match($namaFungsi) {
                                     'Operation'        => 'bg-[#5AA2D7]',
                                     'Maintenance'      => 'bg-[#ED7D31]',
@@ -192,72 +192,8 @@
         </div>
 
         {{-- ================================================================
-             CHART 2a — REPORTING RATE AREA LHD (NEW — PR 1)
-             Ditempatkan DI ATAS Reporting Rate per Fungsi
+     CHART 2 — REPORTING RATE per FUNGSI (termasuk AREA LHD sebagai bar pertama)
         ================================================================ --}}
-        @php
-            $lhd = $charts['reporting_lhd'] ?? ['aktif' => false];
-        @endphp
-        <div class="lg:col-span-2 bg-gradient-to-br from-[#002060] to-[#003090] rounded-2xl border border-[#001540] shadow-[0_4px_20px_-4px_rgba(0,32,96,0.4)] overflow-hidden">
-            <div class="px-6 py-5">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <!-- Judul & info -->
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-widest text-blue-300 mb-1">Area LHD — Seluruh Fungsi</p>
-                        <h3 class="text-xl font-bold text-white">Reporting Rate Area LHD</h3>
-                        @if($lhd['aktif'] && ($selectedMonth ?? null))
-                            <p class="text-sm text-blue-200 mt-1">Periode: {{ $lhd['periode_label'] ?? '' }}</p>
-                        @elseif(!($selectedYear ?? null))
-                            <p class="text-sm text-blue-300 mt-1">Pilih Tahun dan Bulan untuk melihat Reporting Rate.</p>
-                        @elseif(!($selectedMonth ?? null))
-                            <p class="text-sm text-blue-300 mt-1">Pilih Bulan untuk menghitung Reporting Rate YTD.</p>
-                        @endif
-                    </div>
-
-                    <!-- Nilai Rate -->
-                    <div class="flex items-center gap-6">
-                        @if($lhd['aktif'])
-                            @if($lhd['tersedia'] && $lhd['rate'] !== null)
-                                <div class="text-center">
-                                    <p class="text-5xl font-black text-white">{{ number_format($lhd['rate'], 2) }}<span class="text-2xl font-bold text-blue-300">%</span></p>
-                                    <p class="text-xs text-blue-300 mt-1">Reporting Rate</p>
-                                </div>
-                                <div class="hidden md:block h-16 w-px bg-blue-700"></div>
-                                <div class="grid grid-cols-3 gap-4 text-center">
-                                    <div>
-                                        <p class="text-2xl font-bold text-white">{{ number_format($lhd['total_temuan']) }}</p>
-                                        <p class="text-xs text-blue-300">Total Temuan YTD</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-2xl font-bold text-white">{{ number_format($lhd['total_manpower']) }}</p>
-                                        <p class="text-xs text-blue-300">Total Manpower</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-2xl font-bold text-white">{{ $lhd['jumlah_bulan'] }}</p>
-                                        <p class="text-xs text-blue-300">Bulan</p>
-                                    </div>
-                                </div>
-                                <div class="hidden md:block">
-                                    <p class="text-xs text-blue-300 font-mono bg-blue-900/50 rounded-lg px-3 py-2 whitespace-nowrap">
-                                        {{ number_format($lhd['total_temuan']) }} ÷ ({{ number_format($lhd['total_manpower']) }} × {{ $lhd['jumlah_bulan'] }}) × 100
-                                    </p>
-                                </div>
-                            @else
-                                <div class="bg-amber-500/20 border border-amber-400/30 rounded-xl px-5 py-3">
-                                    <p class="text-amber-300 font-semibold text-sm">⚠️ Data manpower untuk periode ini belum tersedia.</p>
-                                    <p class="text-amber-200 text-xs mt-1">Reporting Rate belum dapat dihitung. Pastikan data manpower sudah diinput untuk bulan yang dipilih.</p>
-                                </div>
-                            @endif
-                        @else
-                            <div class="text-center text-blue-300">
-                                <svg class="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <p class="text-sm">Pilih <strong>Tahun</strong> dan <strong>Bulan</strong> di atas untuk menampilkan Reporting Rate Area LHD.</p>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Chart 2b: Reporting Rate per Fungsi (Horizontal Bar) -->
         <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[380px]">
@@ -272,7 +208,7 @@
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-base font-bold text-slate-800">{{ $rrLabel }}</h3>
                 @if($rrMode === 'manpower_rasio')
-                    <span class="text-xs font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">temuan YTD ÷ (manpower × bulan) × 100</span>
+                    <span class="text-xs font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">temuan YTD ÷ (manpower × bulan)</span>
                 @endif
             </div>
             @if($rrMode === 'manpower_rasio' && $hasNull)
@@ -286,34 +222,105 @@
         </div>
 
         {{-- ================================================================
-             CHART TRENDING TEMUAN (NEW — PR 3) — full width
+             CHART REKAP PEKA BULANAN (Trending Temuan — revisi)
+             Full width, hanya mengikuti filter TAHUN
         ================================================================ --}}
-        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[380px]">
-            <div class="flex items-center justify-between mb-4">
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="min-height:500px">
+
+            {{-- Header --}}
+            <div class="flex items-center justify-between mb-4 flex-shrink-0">
                 <div>
-                    <h3 class="text-base font-bold text-slate-800">Trending Temuan{{ ($selectedYear ?? null) ? ' ' . $selectedYear : '' }}</h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Jumlah temuan per bulan sepanjang tahun {{ ($selectedYear ?? null) ? $selectedYear : 'yang dipilih' }}. Dropdown bulan tidak memengaruhi grafik ini.</p>
+                    <h3 class="text-base font-bold text-slate-800">
+                        Rekap PEKA{{ ($selectedYear ?? null) ? ' Tahun ' . $selectedYear : '' }}
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        Distribusi laporan PEKA per bulan sepanjang tahun{{ ($selectedYear ?? null) ? ' ' . $selectedYear : ' yang dipilih' }}.
+                        Dropdown bulan tidak memengaruhi grafik ini.
+                    </p>
                 </div>
                 @if(!($selectedYear ?? null))
-                    <span class="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">Pilih tahun untuk melihat trending</span>
+                    <span class="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                        Pilih tahun untuk melihat Rekap PEKA
+                    </span>
                 @endif
             </div>
-            <div class="flex-1 relative w-full h-full">
-                <canvas id="chartTrending"></canvas>
+
+            {{-- Body: Chart + Closing Rate Card --}}
+            <div class="flex gap-4 flex-1 min-h-0">
+
+                {{-- Chart Canvas Area --}}
+                <div class="flex-1 relative min-h-0" style="min-height:280px">
+                    <canvas id="chartTrending"></canvas>
+                </div>
+
+                {{-- Closing Rate Card --}}
+                <div class="flex-shrink-0 w-40 flex flex-col gap-3">
+                    <div id="closing-rate-card"
+                         class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm flex-1">
+                        <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Closing Rate</p>
+                        <p id="closing-rate-value"
+                           class="text-3xl font-bold text-blue-700 leading-tight">—</p>
+                        <p class="text-xs text-blue-500 mt-1">dari total laporan</p>
+                        <div class="mt-3 pt-3 border-t border-blue-200 w-full text-center">
+                            <p id="closing-rate-closed" class="text-sm font-bold text-slate-700">—</p>
+                            <p class="text-xs text-slate-500">Closed</p>
+                            <p id="closing-rate-total" class="text-sm font-bold text-slate-700 mt-1">—</p>
+                            <p class="text-xs text-slate-500">Total Laporan</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>{{-- end Body --}}
+
+            {{-- Summary Text --}}
+            <div class="flex-shrink-0 mt-4 pt-3 border-t border-slate-100">
+                <p id="trending-summary" class="text-xs text-slate-500 leading-relaxed">
+                    {{-- diisi via JavaScript --}}
+                    @if(!($selectedYear ?? null))
+                        Pilih tahun untuk melihat rekap PEKA.
+                    @endif
+                </p>
             </div>
-        </div>
+
+        </div>{{-- end card --}}
+
 
         <!-- Chart 3: Kategori PEKA (Pie) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="min-height:400px">
             <h3 class="text-base font-bold text-slate-800 mb-4">3. Kategori PEKA</h3>
-            <div class="flex-1 relative w-full h-full">
+            <div class="flex-1 relative w-full" style="min-height:300px">
                 <canvas id="chart3"></canvas>
+            </div>
+            <!-- Statistik Positif / Negatif -->
+            <div id="chart3-stats" class="mt-4 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 space-y-1 hidden">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                    <span>Jumlah laporan positif <strong id="chart3-positif">-</strong></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                    <span>Jumlah laporan negatif <strong id="chart3-negatif">-</strong></span>
+                </div>
             </div>
         </div>
 
         <!-- Chart 4: Keterlibatan Observasi (Stacked Vertical Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">4. Keterlibatan dalam Observasi</h3>
+            <h3 class="text-base font-bold text-slate-800 mb-1">4. Keterlibatan dalam Observasi</h3>
+            <p class="text-xs text-slate-400 mb-3">
+                Rumus: Pelapor unik Jan s/d bulan terpilih &divide; Manpower bulan terpilih &times; 100%
+            </p>
+
+            {{-- Notice: belum pilih bulan (Blade — ditampilkan server-side) --}}
+            @if(!($selectedMonth ?? null))
+                <div class="mb-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                    ℹ️ Pilih <strong>Bulan</strong> pada filter di atas untuk menampilkan persentase keterlibatan.
+                </div>
+            @endif
+
+            {{-- Notice JS: muncul jika manpower tidak tersedia (diisi via JS) --}}
+            <div id="chart4-notice" class="hidden mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></div>
+
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart4"></canvas>
             </div>
@@ -357,7 +364,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const charts = @json($charts ?? []);
@@ -372,10 +379,10 @@
             'Maintenance': '#ED7D31', 
             'HSSE': '#A5A5A5', 
             'Business Support': '#FFC000',
-            'Tindakan aman': '#5AA2D7',
-            'Kondisi aman': '#ED7D31',
-            'Tindakan tidak aman': '#A5A5A5',
-            'Kondisi tidak aman': '#FFC000',
+            'Safe Action': '#5AA2D7',
+            'Safe Condition': '#ED7D31',
+            'Unsafe Action': '#A5A5A5',
+            'Unsafe Condition': '#FFC000',
         };
 
         // Helper to get array of values and labels from assoc array
@@ -390,6 +397,7 @@
 
         new Chart(document.getElementById('chart1'), {
             type: 'pie',
+            plugins: [ChartDataLabels],
             data: {
                 labels: chart1Labels,
                 datasets: [{
@@ -403,6 +411,18 @@
                 ...commonOptions,
                 plugins: {
                     legend: { position: 'bottom' },
+                    datalabels: {
+                        color: '#333',
+                        font: {
+                            weight: 'normal',
+                            size: 11
+                        },
+                        formatter: (value) => {
+                            if (value === 0 || chart1Total === 0) return null;
+                            const pct = ((value / chart1Total) * 100).toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            return pct + '%';
+                        }
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(ctx) {
@@ -419,18 +439,18 @@
             }
         });
 
-        // 2. Horizontal Bar - Reporting Rate per Fungsi
-        // Hanya tampilkan fungsi yang bukan AREA LHD (LHD sudah di card terpisah)
-        // dan yang memiliki data (bukan null)
+        // 2. Horizontal Bar - Reporting Rate per Fungsi (+ AREA LHD di paling atas)
+        // null = manpower belum tersedia, skip dari chart
         const rrAllData = charts.reporting.data || {};
         const rrMode    = charts.reporting.mode || 'distribusi';
-        
-        // Filter: exclude AREA LHD dari chart2 (sudah ditampilkan di card LHD)
-        // Untuk mode manpower_rasio, null = data manpower tidak tersedia
-        const rrLabels = Object.keys(rrAllData).filter(k => k !== 'AREA LHD' && rrAllData[k] !== null);
+
+        // Tampilkan semua label (termasuk AREA LHD di paling atas)
+        // null = manpower belum tersedia, skip dari chart
+        const rrLabels = Object.keys(rrAllData).filter(k => rrAllData[k] !== null);
         const rrValues = rrLabels.map(k => rrAllData[k]);
         
         const rrColorMap = {
+            'AREA LHD': '#002060',
             'Operation': '#5B9BD5',
             'Maintenance': '#ED7D31',
             'HSSE': '#A5A5A5',
@@ -459,7 +479,7 @@
                                 label: (ctx) => {
                                     const val = ctx.raw;
                                     return rrMode === 'manpower_rasio'
-                                        ? ` ${val}% (temuan YTD ÷ manpower × bulan × 100)`
+                                        ? ` ${val} (temuan YTD ÷ manpower × bulan)`
                                         : ` ${val}`;
                                 }
                             }
@@ -482,7 +502,7 @@
                                 var meta = chartInstance.getDatasetMeta(i);
                                 meta.data.forEach(function (bar, index) {
                                     var data = dataset.data[index];
-                                    var label = rrMode === 'manpower_rasio' ? data + '%' : data;
+                                    var label = rrMode === 'manpower_rasio' ? data : data;
                                     ctx.fillText(label, bar.x + 5, bar.y);
                                 });
                             });
@@ -493,92 +513,372 @@
         }
 
         // ================================================================
-        // CHART TRENDING TEMUAN (NEW — PR 3)
-        // Selalu 12 bulan, hanya mengikuti filter TAHUN (bukan bulan)
+        // CHART REKAP PEKA BULANAN (Trending Temuan — revisi)
+        // Stacked Bar (4 kategori) + Total Line
+        // Hanya mengikuti filter TAHUN, bukan bulan
         // ================================================================
-        const trendingData = charts.trending || {};
-        const bulanLabels  = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-        // trendingData adalah {1: count, 2: count, ..., 12: count}
-        const trendingValues = bulanLabels.map((_, i) => trendingData[i + 1] || 0);
+        (function() {
+            const trendingRaw    = charts.trending || {};
+            const trendMonths    = trendingRaw.months    || [];
+            const annualTotal    = trendingRaw.annual_total || 0;
+            const closedTotal    = trendingRaw.closed_total  || 0;
+            const closingRate    = trendingRaw.closing_rate  || 0;
+            const trendYear      = trendingRaw.year          || null;
 
-        new Chart(document.getElementById('chartTrending'), {
-            type: 'line',
-            data: {
-                labels: bulanLabels,
-                datasets: [{
-                    label: 'Jumlah Temuan',
-                    data: trendingValues,
-                    borderColor: '#5AA2D7',
-                    backgroundColor: 'rgba(90, 162, 215, 0.1)',
-                    borderWidth: 2.5,
-                    pointBackgroundColor: '#5AA2D7',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    fill: true,
-                    tension: 0.35,
-                }]
-            },
-            options: {
-                ...commonOptions,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => ` ${ctx.raw.toLocaleString('id-ID')} temuan`
-                        }
+            // ---- Label bulan (fallback jika months kosong) ---------------
+            const defaultLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+                                   'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const bulanLabels = trendMonths.length === 12
+                ? trendMonths.map(m => m.month)
+                : defaultLabels;
+
+            // ---- Ekstrak data per kategori --------------------------------
+            const saData  = trendMonths.map(m => m.safe_action      || 0);
+            const scData  = trendMonths.map(m => m.safe_condition    || 0);
+            const uaData  = trendMonths.map(m => m.unsafe_action     || 0);
+            const ucData  = trendMonths.map(m => m.unsafe_condition  || 0);
+            const totData = trendMonths.map(m => m.total             || 0);
+
+            // Isi pad jika months < 12 (misal tahun belum dipilih)
+            while (saData.length  < 12) { saData.push(0);  scData.push(0);
+                                          uaData.push(0);  ucData.push(0);
+                                          totData.push(0); }
+
+            // ---- Render Chart.js (mixed: bar + line) ---------------------
+            const trendCanvas = document.getElementById('chartTrending');
+            if (trendCanvas) {
+                new Chart(trendCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: bulanLabels,
+                        datasets: [
+                            // ---- 4 Stacked Bar ----
+                            {
+                                label: 'Safe Action',
+                                type: 'bar',
+                                data: saData,
+                                backgroundColor: '#22c55e',
+                                stack: 'peka',
+                                borderRadius: { topLeft: 0, topRight: 0 },
+                                order: 2,
+                            },
+                            {
+                                label: 'Safe Condition',
+                                type: 'bar',
+                                data: scData,
+                                backgroundColor: '#86efac',
+                                stack: 'peka',
+                                order: 2,
+                            },
+                            {
+                                label: 'Unsafe Action',
+                                type: 'bar',
+                                data: uaData,
+                                backgroundColor: '#f97316',
+                                stack: 'peka',
+                                order: 2,
+                            },
+                            {
+                                label: 'Unsafe Condition',
+                                type: 'bar',
+                                data: ucData,
+                                backgroundColor: '#ef4444',
+                                stack: 'peka',
+                                borderRadius: { topLeft: 3, topRight: 3 },
+                                order: 2,
+                            },
+                            // ---- Total Line ----
+                            {
+                                label: 'Total',
+                                type: 'line',
+                                data: totData,
+                                borderColor: '#5AA2D7',
+                                backgroundColor: 'rgba(90, 162, 215, 0.08)',
+                                borderWidth: 2.5,
+                                pointBackgroundColor: '#5AA2D7',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 5,
+                                pointHoverRadius: 7,
+                                fill: false,
+                                tension: 0.3,
+                                order: 1,
+                                stack: undefined,
+                            },
+                        ]
+                    },
+                    options: {
+                        ...commonOptions,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                grid: { display: false },
+                                ticks: { font: { size: 11 } },
+                            },
+                            y: {
+                                stacked: true,
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                ticks: {
+                                    callback: (v) => v.toLocaleString('id-ID'),
+                                    font: { size: 11 },
+                                },
+                            },
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 14,
+                                    usePointStyle: true,
+                                    pointStyleWidth: 10,
+                                    font: { size: 11 },
+                                },
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(ctx) {
+                                        const val = ctx.raw;
+                                        const suffix = ctx.dataset.label === 'Total'
+                                            ? ' laporan (total)'
+                                            : ' laporan';
+                                        return ` ${ctx.dataset.label}: ${val.toLocaleString('id-ID')}${suffix}`;
+                                    }
+                                }
+                            },
+                        },
                     }
-                },
-                scales: {
-                    x: { grid: { display: false } },
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: 'rgba(0,0,0,0.05)' },
-                        ticks: {
-                            callback: (v) => v.toLocaleString('id-ID')
-                        }
-                    }
-                }
+                });
             }
-        });
 
-        // 3. Pie Chart - Kategori PEKA
+            // ---- Update Closing Rate Card ---------------------------------
+            const fmt   = (n) => n.toLocaleString('id-ID');
+            const fmtPct = (r) => r.toLocaleString('id-ID', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+
+            const crVal   = document.getElementById('closing-rate-value');
+            const crClose = document.getElementById('closing-rate-closed');
+            const crTotal = document.getElementById('closing-rate-total');
+
+            if (crVal)   crVal.textContent   = annualTotal > 0 ? fmtPct(closingRate) + '%' : '—';
+            if (crClose) crClose.textContent = annualTotal > 0 ? fmt(closedTotal)            : '—';
+            if (crTotal) crTotal.textContent = annualTotal > 0 ? fmt(annualTotal)             : '—';
+
+            // ---- Update Summary Text --------------------------------------
+            const summaryEl = document.getElementById('trending-summary');
+            if (summaryEl && annualTotal > 0) {
+                const pctStr   = fmtPct(closingRate).replace('.', ',');
+                const totalStr = fmt(annualTotal);
+                const closStr  = fmt(closedTotal);
+                summaryEl.innerHTML =
+                    `<span class="text-slate-600 font-medium">&#9679;</span> `
+                    + `Jumlah Pelaporan PEKA <strong>${totalStr} laporan</strong> `
+                    + `dengan closing rate <strong>${pctStr}%</strong> `
+                    + `(<strong>${closStr} laporan</strong>).`;
+            }
+        })();
+
+
+        const chart3Labels = getLabels(charts.kategori);
+        const chart3Values = getValues(charts.kategori);
+        const chart3Total = chart3Values.reduce((a, b) => a + b, 0);
+
         new Chart(document.getElementById('chart3'), {
             type: 'pie',
+            plugins: [ChartDataLabels],
             data: { 
-                labels: getLabels(charts.kategori), 
+                labels: chart3Labels, 
                 datasets: [{ 
-                    data: getValues(charts.kategori), 
-                    backgroundColor: getBgColors(getLabels(charts.kategori)) 
+                    data: chart3Values, 
+                    backgroundColor: getBgColors(chart3Labels),
+                    borderWidth: 2,
+                    borderColor: '#fff',
                 }] 
-            },
-            options: { ...commonOptions, plugins: { legend: { position: 'right' } } }
-        });
-
-        // 4. Stacked Vertical Bar - Keterlibatan
-        const invLabels = getLabels(charts.keterlibatan);
-        const invData = getValues(charts.keterlibatan);
-        const remData = invData.map(v => 100 - v);
-        
-        new Chart(document.getElementById('chart4'), {
-            type: 'bar',
-            data: {
-                labels: invLabels,
-                datasets: [
-                    { label: 'Keterlibatan', data: invData, backgroundColor: '#ED7D31' },
-                    { label: 'Jumlah', data: remData, backgroundColor: '#5AA2D7' }
-                ]
             },
             options: { 
                 ...commonOptions, 
-                scales: { 
-                    x: { stacked: true, grid: { display: false } }, 
-                    y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } } 
-                },
-                plugins: { legend: { position: 'bottom' } }
+                plugins: { 
+                    legend: { position: 'right' },
+                    datalabels: {
+                        color: '#333',
+                        font: {
+                            weight: 'normal',
+                            size: 11
+                        },
+                        formatter: (value) => {
+                            if (value === 0 || chart3Total === 0) return null;
+                            const pct = Math.round((value / chart3Total) * 100);
+                            return pct + '%';
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const val = ctx.raw;
+                                const pct = chart3Total > 0 ? Math.round((val / chart3Total) * 100) : 0;
+                                return [
+                                    ' ' + val.toLocaleString('id-ID') + ' Pelaporan',
+                                    ' ' + pct + '%'
+                                ];
+                            }
+                        }
+                    }
+                } 
             }
         });
+
+        // Hitung & tampilkan statistik Positif / Negatif (di bawah pie)
+        if (chart3Total > 0) {
+            const positifKeys = ['Safe Action', 'Safe Condition'];
+            const negatifKeys  = ['Unsafe Action', 'Unsafe Condition'];
+            const positifTotal = positifKeys.reduce((sum, k) => sum + (charts.kategori[k] || 0), 0);
+            const negatifTotal  = negatifKeys.reduce((sum, k) => sum + (charts.kategori[k] || 0), 0);
+            const fmt = (n) => (chart3Total > 0 ? (n / chart3Total * 100).toFixed(2) : '0.00').replace('.', ',');
+            const statsEl = document.getElementById('chart3-stats');
+            if (statsEl) {
+                document.getElementById('chart3-positif').textContent = fmt(positifTotal) + ' %';
+                document.getElementById('chart3-negatif').textContent  = fmt(negatifTotal)  + ' %';
+                statsEl.classList.remove('hidden');
+            }
+        }
+
+        // ================================================================
+        // 4. Stacked Vertical Bar — Keterlibatan dalam Observasi
+        //
+        // Data: [fungsi => float|null]
+        //   float = persentase keterlibatan (pelapor unik ÷ manpower × 100)
+        //   null  = bulan belum dipilih, atau manpower tidak tersedia
+        //
+        // FIX: Chart SELALU dirender selama ada minimal 1 fungsi.
+        //   - Fungsi null → placeholder abu-abu (data belum tersedia)
+        //   - Fungsi float → bar normal (Keterlibatan + Sisa 100%)
+        //   - allNull → tetap render chart placeholder + notice informatif
+        // ================================================================
+        (function() {
+            const invRaw    = charts.keterlibatan || {};
+            const invLabels = Object.keys(invRaw);
+            const notice4   = document.getElementById('chart4-notice');
+
+            // Jika tidak ada label sama sekali, tidak ada yang bisa dirender
+            if (invLabels.length === 0) return;
+
+            const allNull  = invLabels.every(k => invRaw[k] === null);
+            const someNull = invLabels.some(k  => invRaw[k] === null);
+
+            // ---- Tampilkan notice yang sesuai --------------------------------
+            if (notice4) {
+                if (allNull) {
+                    // Semua null: bulan belum dipilih atau manpower belum ada
+                    // (pesan "pilih bulan" ditampilkan oleh Blade jika bulan = null;
+                    //  JS hanya menampilkan pesan manpower jika bulan sudah dipilih)
+                    const selectedMonth = {{ $selectedMonth ?? 'null' }};
+                    if (selectedMonth) {
+                        // Bulan sudah dipilih tapi manpower belum ada
+                        notice4.innerHTML = '⚠️ Data manpower belum tersedia untuk periode ini. Pastikan data manpower sudah diinput di menu <strong>Master Manpower</strong>.';
+                        notice4.classList.remove('hidden');
+                    }
+                    // Jika bulan null, Blade sudah menampilkan notice "Pilih Bulan"
+                } else if (someNull) {
+                    // Sebagian fungsi tidak ada manpower
+                    const missingFungsi = invLabels.filter(k => invRaw[k] === null).join(', ');
+                    notice4.innerHTML = `⚠️ Manpower belum tersedia untuk: <strong>${missingFungsi}</strong>. Fungsi lain ditampilkan normal.`;
+                    notice4.classList.remove('hidden');
+                }
+            }
+
+            // ---- Siapkan data chart -----------------------------------------
+            // Fungsi dengan nilai: gunakan nilai aktual (capped 100 untuk visual)
+            // Fungsi null: Keterlibatan=0, Sisa=100 (bar abu-abu penuh)
+            const invData = invLabels.map(k => invRaw[k] !== null ? Math.min(invRaw[k], 100) : 0);
+            const remData = invLabels.map(k => invRaw[k] !== null ? Math.max(100 - Math.min(invRaw[k], 100), 0) : 100);
+
+            // Warna: fungsi dengan data → normal; fungsi null → abu-abu
+            const ketBgColors = invLabels.map(k => invRaw[k] !== null ? '#ED7D31' : 'transparent');
+            const sisBgColors = invLabels.map(k => invRaw[k] !== null ? '#5AA2D7'  : '#E2E8F0');
+
+            // ---- Render Chart ------------------------------------------------
+            new Chart(document.getElementById('chart4'), {
+                type: 'bar',
+                plugins: [ChartDataLabels],
+                data: {
+                    labels: invLabels,
+                    datasets: [
+                        {
+                            label: 'Keterlibatan',
+                            data: invData,
+                            backgroundColor: ketBgColors,
+                            datalabels: {
+                                color: '#fff',
+                                anchor: 'center',
+                                align: 'center',
+                                font: { weight: 'bold', size: 12 },
+                                formatter: (value, ctx) => {
+                                    const key = invLabels[ctx.dataIndex];
+                                    if (invRaw[key] === null) return null; // fungsi null → jangan label
+                                    if (value === 0) return null;
+                                    return invRaw[key].toLocaleString('id-ID', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    }) + '%';
+                                }
+                            }
+                        },
+                        {
+                            label: 'Belum Melapor',
+                            data: remData,
+                            backgroundColor: sisBgColors,
+                            datalabels: {
+                                display: (ctx) => {
+                                    // Tampilkan label "N/A" di tengah bar abu-abu jika null
+                                    const key = invLabels[ctx.dataIndex];
+                                    return invRaw[key] === null;
+                                },
+                                color: '#94A3B8',
+                                anchor: 'center',
+                                align: 'center',
+                                font: { size: 11, style: 'italic' },
+                                formatter: () => 'N/A',
+                            }
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: {
+                            stacked: true,
+                            max: 100,
+                            ticks: { callback: v => v + '%' }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        datalabels: { display: false }, // default off; per-dataset override di atas
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const key = invLabels[ctx.dataIndex];
+                                    if (invRaw[key] === null) {
+                                        return ctx.datasetIndex === 1
+                                            ? ' Data manpower belum tersedia'
+                                            : null;
+                                    }
+                                    if (ctx.datasetIndex === 1) return null; // sembunyikan baris "Belum Melapor" di tooltip
+                                    return ` Keterlibatan: ${invRaw[key].toLocaleString('id-ID', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        })();
 
         // 5. Stacked Vertical Bar - Rekap % Temuan Fungsi
         const ptLabels = getLabels(charts.persentase_fungsi);

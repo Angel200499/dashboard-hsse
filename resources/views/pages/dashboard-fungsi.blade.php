@@ -158,16 +158,34 @@
         </div>
 
         <!-- Chart 3: Kategori PEKA (Pie) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="min-height:400px">
             <h3 class="text-base font-bold text-slate-800 mb-4">3. Kategori PEKA</h3>
-            <div class="flex-1 relative w-full h-full">
+            <div class="flex-1 relative w-full" style="min-height:300px">
                 <canvas id="chart3"></canvas>
+            </div>
+            <!-- Statistik Positif / Negatif -->
+            <div id="chart3-stats" class="mt-4 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 space-y-1 hidden">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                    <span>Jumlah laporan positif <strong id="chart3-positif">-</strong></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                    <span>Jumlah laporan negatif <strong id="chart3-negatif">-</strong></span>
+                </div>
             </div>
         </div>
 
         <!-- Chart 4: Keterlibatan Observasi (Stacked Vertical Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">4. Keterlibatan dalam Observasi</h3>
+            <h3 class="text-base font-bold text-slate-800 mb-1">4. Keterlibatan dalam Observasi</h3>
+            <p class="text-xs text-slate-400 mb-3">
+                Rumus: Pelapor unik bulan terpilih &divide; Manpower bulan terpilih &times; 100%
+            </p>
+            <!-- Notice: muncul jika manpower tidak tersedia -->
+            <div id="chart4-notice" class="hidden mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                ⚠️ Data manpower belum tersedia untuk periode ini. Pilih Tahun dan Bulan, lalu pastikan data manpower sudah diinput.
+            </div>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart4"></canvas>
             </div>
@@ -451,7 +469,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const charts = @json($charts ?? []);
@@ -466,10 +484,10 @@
             'Maintenance': '#ED7D31', 
             'HSSE': '#A5A5A5', 
             'Business Support': '#FFC000',
-            'Tindakan aman': '#5AA2D7',
-            'Kondisi aman': '#ED7D31',
-            'Tindakan tidak aman': '#A5A5A5',
-            'Kondisi tidak aman': '#FFC000',
+            'Safe Action': '#5AA2D7',
+            'Safe Condition': '#ED7D31',
+            'Unsafe Action': '#A5A5A5',
+            'Unsafe Condition': '#FFC000',
             'Tidak ada temuan': '#94a3b8',
         };
 
@@ -479,16 +497,52 @@
         const getBgColors = (keys) => keys.map(k => colors[k] || '#9CA3AF');
 
         // 1. Pie Chart - % PEKA Per Fungsi
+        const chart1Labels = getLabels(charts.fungsi);
+        const chart1Values = getValues(charts.fungsi);
+        const chart1Total = chart1Values.reduce((a, b) => a + b, 0);
+
         new Chart(document.getElementById('chart1'), {
             type: 'pie',
+            plugins: [ChartDataLabels],
             data: { 
-                labels: getLabels(charts.fungsi), 
+                labels: chart1Labels, 
                 datasets: [{ 
-                    data: getValues(charts.fungsi), 
-                    backgroundColor: getBgColors(getLabels(charts.fungsi)) 
+                    data: chart1Values, 
+                    backgroundColor: getBgColors(chart1Labels),
+                    borderWidth: 2,
+                    borderColor: '#fff',
                 }] 
             },
-            options: { ...commonOptions, plugins: { legend: { position: 'bottom' } } }
+            options: { 
+                ...commonOptions, 
+                plugins: { 
+                    legend: { position: 'bottom' },
+                    datalabels: {
+                        color: '#333',
+                        font: {
+                            weight: 'normal',
+                            size: 11
+                        },
+                        formatter: (value) => {
+                            if (value === 0 || chart1Total === 0) return null;
+                            const pct = ((value / chart1Total) * 100).toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            return pct + '%';
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const val = ctx.raw;
+                                const pct = chart1Total > 0 ? ((val / chart1Total) * 100).toFixed(1) : 0;
+                                return [
+                                    ' ' + val.toLocaleString('id-ID') + ' Pelaporan',
+                                    ' ' + pct + '%'
+                                ];
+                            }
+                        }
+                    }
+                } 
+            }
         });
 
         // 2. Horizontal Bar - Reporting Rate per Fungsi
@@ -525,7 +579,7 @@
                                 label: (ctx) => {
                                     const val = ctx.raw;
                                     return rrMode === 'manpower_rasio'
-                                        ? ` ${val}% (temuan YTD ÷ manpower × bulan × 100)`
+                                        ? ` ${val} (temuan YTD ÷ manpower × bulan)`
                                         : ` ${val}`;
                                 }
                             }
@@ -548,7 +602,7 @@
                                 var meta = chartInstance.getDatasetMeta(i);
                                 meta.data.forEach(function (bar, index) {
                                     var data = dataset.data[index];
-                                    var label = rrMode === 'manpower_rasio' ? data + '%' : data;
+                                    var label = rrMode === 'manpower_rasio' ? data : data;
                                     ctx.fillText(label, bar.x + 5, bar.y);
                                 });
                             });
@@ -559,41 +613,142 @@
         }
 
         // 3. Pie Chart - Kategori PEKA
+        const chart3Labels = getLabels(charts.kategori);
+        const chart3Values = getValues(charts.kategori);
+        const chart3Total = chart3Values.reduce((a, b) => a + b, 0);
+
         new Chart(document.getElementById('chart3'), {
             type: 'pie',
+            plugins: [ChartDataLabels],
             data: { 
-                labels: getLabels(charts.kategori), 
+                labels: chart3Labels, 
                 datasets: [{ 
-                    data: getValues(charts.kategori), 
-                    backgroundColor: getBgColors(getLabels(charts.kategori)) 
+                    data: chart3Values, 
+                    backgroundColor: getBgColors(chart3Labels),
+                    borderWidth: 2,
+                    borderColor: '#fff',
                 }] 
-            },
-            options: { ...commonOptions, plugins: { legend: { position: 'right' } } }
-        });
-
-        // 4. Stacked Vertical Bar - Keterlibatan
-        const invLabels = getLabels(charts.keterlibatan);
-        const invData = getValues(charts.keterlibatan);
-        const remData = invData.map(v => 100 - v);
-        
-        new Chart(document.getElementById('chart4'), {
-            type: 'bar',
-            data: {
-                labels: invLabels,
-                datasets: [
-                    { label: 'Keterlibatan', data: invData, backgroundColor: '#ED7D31' },
-                    { label: 'Jumlah', data: remData, backgroundColor: '#5AA2D7' }
-                ]
             },
             options: { 
                 ...commonOptions, 
-                scales: { 
-                    x: { stacked: true, grid: { display: false } }, 
-                    y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } } 
-                },
-                plugins: { legend: { position: 'bottom' } }
+                plugins: { 
+                    legend: { position: 'right' },
+                    datalabels: {
+                        color: '#333',
+                        font: {
+                            weight: 'normal',
+                            size: 11
+                        },
+                        formatter: (value) => {
+                            if (value === 0 || chart3Total === 0) return null;
+                            const pct = Math.round((value / chart3Total) * 100);
+                            return pct + '%';
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const val = ctx.raw;
+                                const pct = chart3Total > 0 ? Math.round((val / chart3Total) * 100) : 0;
+                                return [
+                                    ' ' + val.toLocaleString('id-ID') + ' Pelaporan',
+                                    ' ' + pct + '%'
+                                ];
+                            }
+                        }
+                    }
+                } 
             }
         });
+
+        // Hitung & tampilkan statistik Positif / Negatif (di bawah pie)
+        if (chart3Total > 0) {
+            const positifKeys = ['Safe Action', 'Safe Condition'];
+            const negatifKeys  = ['Unsafe Action', 'Unsafe Condition'];
+            const positifTotal = positifKeys.reduce((sum, k) => sum + (charts.kategori[k] || 0), 0);
+            const negatifTotal  = negatifKeys.reduce((sum, k) => sum + (charts.kategori[k] || 0), 0);
+            const fmt = (n) => (chart3Total > 0 ? (n / chart3Total * 100).toFixed(2) : '0.00').replace('.', ',');
+            const statsEl = document.getElementById('chart3-stats');
+            if (statsEl) {
+                document.getElementById('chart3-positif').textContent = fmt(positifTotal) + ' %';
+                document.getElementById('chart3-negatif').textContent  = fmt(negatifTotal)  + ' %';
+                statsEl.classList.remove('hidden');
+            }
+        }
+
+        // 4. Stacked Vertical Bar - Keterlibatan
+        // Data berupa [fungsi => float|null]. null = manpower tidak tersedia.
+        const invRaw    = charts.keterlibatan;
+        const invLabels = Object.keys(invRaw);
+        const invData   = invLabels.map(k => invRaw[k] !== null ? Math.min(invRaw[k], 100) : 0);
+        const remData   = invLabels.map(k => invRaw[k] !== null ? Math.max(100 - invRaw[k], 0) : 100);
+
+        const allNull   = invLabels.every(k => invRaw[k] === null);
+        const someNull  = invLabels.some(k => invRaw[k] === null);
+        const notice4   = document.getElementById('chart4-notice');
+
+        if (allNull) {
+            if (notice4) notice4.classList.remove('hidden');
+        } else {
+            if (notice4 && someNull) {
+                notice4.textContent = '⚠️ Beberapa fungsi tidak memiliki data manpower untuk periode ini.';
+                notice4.classList.remove('hidden');
+            }
+
+            new Chart(document.getElementById('chart4'), {
+                type: 'bar',
+                plugins: [ChartDataLabels],
+                data: {
+                    labels: invLabels,
+                    datasets: [
+                        {
+                            label: 'Keterlibatan',
+                            data: invData,
+                            backgroundColor: '#ED7D31',
+                            datalabels: {
+                                color: '#fff',
+                                anchor: 'center',
+                                align: 'center',
+                                font: { weight: 'bold', size: 12 },
+                                formatter: (value, ctx) => {
+                                    const key = invLabels[ctx.dataIndex];
+                                    if (invRaw[key] === null) return null;
+                                    if (value === 0) return null;
+                                    return invRaw[key].toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+                                }
+                            }
+                        },
+                        {
+                            label: 'Sisa',
+                            data: remData,
+                            backgroundColor: '#5AA2D7',
+                            datalabels: { display: false }
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        datalabels: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const key = invLabels[ctx.dataIndex];
+                                    if (invRaw[key] === null) return ' Data manpower belum tersedia';
+                                    if (ctx.datasetIndex === 1) return null;
+                                    return ` Keterlibatan: ${invRaw[key].toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         // 5. Stacked Vertical Bar - Rekap % Temuan Fungsi
         const ptLabels = getLabels(charts.persentase_fungsi);

@@ -23,13 +23,15 @@ class MasterFunctionMappingController extends Controller
             ->orderBy('fungsi_sipeka')
             ->get();
 
-        $unmappedFungsi = MasterFunctionMapping::unmappedFungsi();
-        $fungsiList     = MasterFunctionMapping::DASHBOARD_FUNGSI_LIST;
+        $unmappedFungsi       = MasterFunctionMapping::unmappedFungsi();
+        $fungsiList           = MasterFunctionMapping::DASHBOARD_FUNGSI_LIST;
+        $kelompokKhususList   = MasterFunctionMapping::KELOMPOK_KHUSUS_LIST;
 
         return view('pages.master.function-mapping.index', compact(
             'mappings',
             'unmappedFungsi',
-            'fungsiList'
+            'fungsiList',
+            'kelompokKhususList'
         ));
     }
 
@@ -41,7 +43,8 @@ class MasterFunctionMappingController extends Controller
     {
         MasterFunctionMapping::create([
             'fungsi_sipeka'    => $request->fungsi_sipeka,
-            'fungsi_dashboard' => $request->fungsi_dashboard,
+            'fungsi_dashboard' => $request->fungsi_dashboard ?: null,
+            'kelompok_khusus'  => $request->kelompok_khusus ?: null,
         ]);
 
         return back()->with('success', 'Mapping fungsi berhasil ditambahkan.');
@@ -55,7 +58,8 @@ class MasterFunctionMappingController extends Controller
     public function update(UpdateMasterFunctionMappingRequest $request, MasterFunctionMapping $mapping)
     {
         $mapping->fungsi_sipeka    = $request->fungsi_sipeka;
-        $mapping->fungsi_dashboard = $request->fungsi_dashboard;
+        $mapping->fungsi_dashboard = $request->fungsi_dashboard ?: null;
+        $mapping->kelompok_khusus  = $request->kelompok_khusus ?: null;
         $mapping->save();
 
         return back()->with('success', 'Mapping fungsi berhasil diperbarui.');
