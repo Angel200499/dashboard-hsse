@@ -30,9 +30,9 @@
         </div>
     </div>
 
-    <!-- ================================================================
-         FILTER BAR — Tahun + Bulan (berlaku untuk SEMUA ROLE)
-    ================================================================ -->
+    {{-- ================================================================
+         $bulanNamaList & $tahunList — dipakai oleh filter in-card
+    ================================================================ --}}
     @php
         $bulanNamaList = [
             1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April',
@@ -41,43 +41,6 @@
         ];
         $tahunList = range(now()->year + 1, 2020);
     @endphp
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm px-5 py-4">
-        <form action="" method="GET" class="flex flex-wrap items-center gap-3" id="global-filter-form">
-            <span class="text-sm font-semibold text-slate-500 mr-1">Filter:</span>
-
-            <select name="year" id="year-filter"
-                onchange="document.getElementById('month-filter').value=''; this.form.submit()"
-                class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
-                <option value="">Semua Tahun</option>
-                @foreach($tahunList as $yr)
-                    <option value="{{ $yr }}" {{ ($selectedYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
-                @endforeach
-            </select>
-
-            <select name="month" id="month-filter"
-                onchange="this.form.submit()"
-                class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm {{ !($selectedYear ?? null) ? 'opacity-50' : '' }}"
-                {{ !($selectedYear ?? null) ? 'disabled' : '' }}>
-                <option value="">Semua Bulan</option>
-                @foreach($bulanNamaList as $num => $nama)
-                    <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
-                @endforeach
-            </select>
-
-            @if(($selectedYear ?? null) || ($selectedMonth ?? null))
-                <a href="{{ route('dashboard') }}" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter</a>
-            @endif
-
-            @if($selectedYear ?? null)
-                <span class="text-xs text-slate-400 ml-2">
-                    Menampilkan data tahun {{ $selectedYear }}
-                    @if($selectedMonth ?? null)
-                        — Reporting Rate: Januari–{{ $bulanNamaList[$selectedMonth] }}
-                    @endif
-                </span>
-            @endif
-        </form>
-    </div>
 
     <!-- KPI Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -192,25 +155,62 @@
         </div>
 
         {{-- ================================================================
-     CHART 2 — REPORTING RATE per FUNGSI (termasuk AREA LHD sebagai bar pertama)
+             CHART 2 — REPORTING RATE per FUNGSI
         ================================================================ --}}
-
-        <!-- Chart 2b: Reporting Rate per Fungsi (Horizontal Bar) -->
         <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[380px]">
             @php
-                $rrMode   = $charts['reporting']['mode'] ?? 'distribusi';
-                $rrLabel  = $rrMode === 'manpower_rasio'
-                    ? '2. Reporting Rate per Fungsi (' . ($charts['reporting']['periode_label'] ?? '') . ')'
-                    : '2. Reporting Rate per Fungsi';
-                $rrData   = $charts['reporting']['data'] ?? [];
-                $hasNull  = in_array(null, $rrData, true);
+                $rrMode = $charts['reporting']['mode'] ?? 'distribusi';
+                $rrData = $charts['reporting']['data'] ?? [];
+                $hasNull = in_array(null, $rrData, true);
+
+                // Teks periode: jika bulan dipilih → tampilkan nama bulan saja
+                // jika hanya tahun → tampilkan label dari backend
+                // jika tidak ada filter → tidak ada label periode
+                if ($rrMode === 'manpower_rasio') {
+                    if ($selectedMonth ?? null) {
+                        $rrPeriodeLabel = $bulanNamaList[$selectedMonth] . ' ' . ($selectedYear ?? '');
+                    } else {
+                        $rrPeriodeLabel = $charts['reporting']['periode_label'] ?? '';
+                    }
+                    $rrLabel = '2. Reporting Rate per Fungsi (' . $rrPeriodeLabel . ')';
+                } else {
+                    $rrLabel = '2. Reporting Rate per Fungsi';
+                }
             @endphp
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-base font-bold text-slate-800">{{ $rrLabel }}</h3>
-                @if($rrMode === 'manpower_rasio')
-                    <span class="text-xs font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">temuan YTD ÷ (manpower × bulan)</span>
-                @endif
+
+            {{-- Header: Judul + Filter in-card --}}
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">{{ $rrLabel }}</h3>
+                    @if($rrMode === 'manpower_rasio')
+                        <span class="text-xs font-mono text-slate-400">temuan YTD ÷ (manpower × bulan)</span>
+                    @endif
+                </div>
+                {{-- Filter Tahun & Bulan — khusus untuk card ini --}}
+                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+                    <select name="year" id="rr-year-filter"
+                        onchange="document.getElementById('rr-month-filter').value=''; this.form.submit()"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        <option value="">Semua Tahun</option>
+                        @foreach($tahunList as $yr)
+                            <option value="{{ $yr }}" {{ ($selectedYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                        @endforeach
+                    </select>
+                    <select name="month" id="rr-month-filter"
+                        onchange="this.form.submit()"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm {{ !($selectedYear ?? null) ? 'opacity-50' : '' }}"
+                        {{ !($selectedYear ?? null) ? 'disabled' : '' }}>
+                        <option value="">Semua Bulan</option>
+                        @foreach($bulanNamaList as $num => $nama)
+                            <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                        @endforeach
+                    </select>
+                    @if(($selectedYear ?? null) || ($selectedMonth ?? null))
+                        <a href="{{ route('dashboard') }}" class="text-xs text-slate-400 hover:text-slate-600 underline whitespace-nowrap">Reset</a>
+                    @endif
+                </form>
             </div>
+
             @if($rrMode === 'manpower_rasio' && $hasNull)
                 <p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mb-2">
                     ⚠️ Beberapa fungsi tidak memiliki data manpower untuk periode ini. Reporting Rate hanya ditampilkan untuk fungsi yang memiliki data manpower.
@@ -225,60 +225,137 @@
              CHART REKAP PEKA BULANAN (Trending Temuan — revisi)
              Full width, hanya mengikuti filter TAHUN
         ================================================================ --}}
-        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="min-height:500px">
-
-            {{-- Header --}}
-            <div class="flex items-center justify-between mb-4 flex-shrink-0">
-                <div>
-                    <h3 class="text-base font-bold text-slate-800">
-                        Rekap PEKA{{ ($selectedYear ?? null) ? ' Tahun ' . $selectedYear : '' }}
-                    </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">
-                        Distribusi laporan PEKA per bulan sepanjang tahun{{ ($selectedYear ?? null) ? ' ' . $selectedYear : ' yang dipilih' }}.
-                        Dropdown bulan tidak memengaruhi grafik ini.
-                    </p>
-                </div>
-                @if(!($selectedYear ?? null))
-                    <span class="text-xs text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
-                        Pilih tahun untuk melihat Rekap PEKA
-                    </span>
-                @endif
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col relative" style="min-height:500px">
+            
+            {{-- Decorative Background Shapes (Match Image) --}}
+            <!-- Top Right Yellow Circle -->
+            <div class="absolute top-0 right-0 w-32 h-32 bg-[#fff7d6] rounded-bl-full opacity-60 pointer-events-none"></div>
+            <div class="absolute top-6 right-6 w-6 h-6 bg-[#fde047] rounded-full opacity-80 pointer-events-none"></div>
+            
+            <!-- Bottom Left Blobs -->
+            <div class="absolute bottom-0 left-0 w-40 h-24 bg-[#fff7d6] rounded-tr-full opacity-60 pointer-events-none"></div>
+            <div class="absolute bottom-0 left-10 w-16 h-16 bg-[#bfdbfe] rounded-t-full opacity-60 pointer-events-none"></div>
+            
+            <!-- Bottom Right Sparks -->
+            <div class="absolute bottom-6 right-8 text-[#fde047] opacity-80 pointer-events-none">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="2" y1="22" x2="6" y2="18"></line>
+                    <line x1="8" y1="23" x2="10" y2="17"></line>
+                    <line x1="2" y1="15" x2="7" y2="14"></line>
+                </svg>
             </div>
 
+            <div class="p-6 flex flex-col flex-1 relative z-10">
+                {{-- Header --}}
+                <div class="flex flex-wrap items-start justify-between gap-3 mb-4 flex-shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M5 9h4v11H5zm6-6h4v17h-4zm6 4h4v13h-4z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-slate-800">Rekap PEKA ({{ $selectedPekaYear }})</h3>
+                            <p class="text-sm text-slate-500">Jumlah temuan berdasarkan kategori dan tren bulanan</p>
+                        </div>
+                    </div>
+                    {{-- Filter Tahun Mandiri — hanya untuk Rekap PEKA --}}
+                    <form action="" method="GET" class="flex items-center gap-2">
+                        {{-- Pertahankan filter chart lain yang sudah aktif --}}
+                        @if($selectedYear)
+                            <input type="hidden" name="year" value="{{ $selectedYear }}">
+                        @endif
+                        @if($selectedMonth)
+                            <input type="hidden" name="month" value="{{ $selectedMonth }}">
+                        @endif
+                        <select name="peka_year" id="peka-year-filter"
+                            onchange="this.form.submit()"
+                            class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                            @foreach($tahunList as $yr)
+                                <option value="{{ $yr }}" {{ $selectedPekaYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                            @endforeach
+                        </select>
+                    </form>
+                </div>
+
             {{-- Body: Chart + Closing Rate Card --}}
-            <div class="flex gap-4 flex-1 min-h-0">
+            <div class="flex flex-col md:flex-row gap-6 flex-1 min-h-0 relative">
 
                 {{-- Chart Canvas Area --}}
-                <div class="flex-1 relative min-h-0" style="min-height:280px">
+                <div class="flex-1 relative min-h-0" style="min-height:350px">
                     <canvas id="chartTrending"></canvas>
                 </div>
 
-                {{-- Closing Rate Card --}}
-                <div class="flex-shrink-0 w-40 flex flex-col gap-3">
+                {{-- Closing Rate Card (Absolute/Floating on Desktop, flow on Mobile) --}}
+                <div class="md:absolute md:-top-4 md:right-4 flex-shrink-0 flex flex-col gap-3 z-10">
                     <div id="closing-rate-card"
-                         class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm flex-1">
-                        <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Closing Rate</p>
-                        <p id="closing-rate-value"
-                           class="text-3xl font-bold text-blue-700 leading-tight">—</p>
-                        <p class="text-xs text-blue-500 mt-1">dari total laporan</p>
-                        <div class="mt-3 pt-3 border-t border-blue-200 w-full text-center">
-                            <p id="closing-rate-closed" class="text-sm font-bold text-slate-700">—</p>
-                            <p class="text-xs text-slate-500">Closed</p>
-                            <p id="closing-rate-total" class="text-sm font-bold text-slate-700 mt-1">—</p>
-                            <p class="text-xs text-slate-500">Total Laporan</p>
+                         class="bg-[#fff0f3] border-2 border-[#ffe0e6] rounded-3xl px-6 py-4 flex items-center gap-5 shadow-sm">
+                        <!-- Icon Circle -->
+                        <div class="w-12 h-12 bg-[#fb3f6c] bg-opacity-10 text-[#fb3f6c] rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border border-[#fb3f6c]/20 relative">
+                            <!-- Inner Solid Circle -->
+                            <div class="w-8 h-8 bg-[#fb3f6c] text-white rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-[15px] font-bold text-[#1e293b] mb-0.5">Closing Rate :</p>
+                            <div class="flex items-center gap-2 relative">
+                                <p id="closing-rate-value" class="text-4xl font-extrabold text-[#fb3f6c] leading-none tracking-tight">—</p>
+                                <!-- Sparkles -->
+                                <div class="absolute -right-6 top-0 text-[#fde047]">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="2" y1="12" x2="6" y2="12"></line>
+                                        <line x1="18" y1="12" x2="22" y2="12"></line>
+                                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                                        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-            </div>{{-- end Body --}}
+            </div>{{-- end Body flex --}}
+
+            {{-- Custom Legend --}}
+            <div class="flex flex-wrap items-center justify-center gap-6 mt-4 mb-2 z-10 relative">
+                <!-- Safe Action -->
+                <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(0, !c.isDatasetVisible(0)); c.update();">
+                    <span class="w-4 h-4 rounded-full bg-[#60a5fa]"></span>
+                    <span class="text-[15px] font-medium text-[#475569]">Safe Action</span>
+                </div>
+                <!-- Safe Condition -->
+                <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(1, !c.isDatasetVisible(1)); c.update();">
+                    <span class="w-4 h-4 rounded-full bg-[#fde047]"></span>
+                    <span class="text-[15px] font-medium text-[#475569]">Safe Condition</span>
+                </div>
+                <!-- Unsafe Action -->
+                <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(2, !c.isDatasetVisible(2)); c.update();">
+                    <span class="w-4 h-4 rounded-full bg-[#fdba74]"></span>
+                    <span class="text-[15px] font-medium text-[#475569]">Unsafe Action</span>
+                </div>
+                <!-- Unsafe Condition -->
+                <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(3, !c.isDatasetVisible(3)); c.update();">
+                    <span class="w-4 h-4 rounded-full bg-[#6ee7b7]"></span>
+                    <span class="text-[15px] font-medium text-[#475569]">Unsafe Condition</span>
+                </div>
+                <!-- Total -->
+                <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity ml-2" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(4, !c.isDatasetVisible(4)); c.update();">
+                    <div class="relative w-7 h-7 flex items-center justify-center">
+                        <!-- Halo pinggiran -->
+                        <div class="absolute inset-0 bg-[#fb3f6c] opacity-15 rounded-full"></div>
+                        <!-- Garis horisontal tembus -->
+                        <div class="absolute w-full h-[3px] bg-[#fb3f6c]"></div>
+                        <!-- Titik tengah padat -->
+                        <div class="absolute w-3.5 h-3.5 bg-[#fb3f6c] rounded-full"></div>
+                    </div>
+                    <span class="text-[15px] font-medium text-[#475569]">Total</span>
+                </div>
+            </div>
 
             {{-- Summary Text --}}
-            <div class="flex-shrink-0 mt-4 pt-3 border-t border-slate-100">
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
                 <p id="trending-summary" class="text-xs text-slate-500 leading-relaxed">
                     {{-- diisi via JavaScript --}}
-                    @if(!($selectedYear ?? null))
-                        Pilih tahun untuk melihat rekap PEKA.
-                    @endif
                 </p>
             </div>
 
@@ -306,10 +383,38 @@
 
         <!-- Chart 4: Keterlibatan Observasi (Stacked Vertical Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-1">4. Keterlibatan dalam Observasi</h3>
-            <p class="text-xs text-slate-400 mb-3">
-                Rumus: Pelapor unik Jan s/d bulan terpilih &divide; Manpower bulan terpilih &times; 100%
-            </p>
+            {{-- Header: Judul + Filter in-card --}}
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">4. Keterlibatan dalam Observasi</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        Rumus: Pelapor unik Jan s/d bulan terpilih &divide; Manpower bulan terpilih &times; 100%
+                    </p>
+                </div>
+                {{-- Filter Tahun & Bulan — khusus untuk card ini --}}
+                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+                    <select name="year" id="ko-year-filter"
+                        onchange="document.getElementById('ko-month-filter').value=''; this.form.submit()"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        <option value="">Semua Tahun</option>
+                        @foreach($tahunList as $yr)
+                            <option value="{{ $yr }}" {{ ($selectedYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                        @endforeach
+                    </select>
+                    <select name="month" id="ko-month-filter"
+                        onchange="this.form.submit()"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm {{ !($selectedYear ?? null) ? 'opacity-50' : '' }}"
+                        {{ !($selectedYear ?? null) ? 'disabled' : '' }}>
+                        <option value="">Semua Bulan</option>
+                        @foreach($bulanNamaList as $num => $nama)
+                            <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                        @endforeach
+                    </select>
+                    @if(($selectedYear ?? null) || ($selectedMonth ?? null))
+                        <a href="{{ route('dashboard') }}" class="text-xs text-slate-400 hover:text-slate-600 underline whitespace-nowrap">Reset</a>
+                    @endif
+                </form>
+            </div>
 
             {{-- Notice: belum pilih bulan (Blade — ditampilkan server-side) --}}
             @if(!($selectedMonth ?? null))
@@ -343,7 +448,7 @@
         </div>
 
         <!-- Chart 7: Unsafe Action (Horizontal Bar) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[500px]">
             <h3 class="text-base font-bold text-slate-800 mb-4">7. Unsafe Action Category</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart7"></canvas>
@@ -351,7 +456,7 @@
         </div>
 
         <!-- Chart 8: Unsafe Condition (Horizontal Bar) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[500px]">
             <h3 class="text-base font-bold text-slate-800 mb-4">8. Unsafe Condition Category</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart8"></canvas>
@@ -544,11 +649,51 @@
                                           uaData.push(0);  ucData.push(0);
                                           totData.push(0); }
 
+            // ---- Custom Plugin: Background Bar untuk Total Line --------
+            const totalBgPlugin = {
+                id: 'totalBgPlugin',
+                beforeDatasetsDraw(chart) {
+                    const { ctx, scales: { x, y } } = chart;
+                    // Gunakan metadata dataset pertama untuk x-position
+                    const meta0 = chart.getDatasetMeta(0);
+                    if (!meta0 || !meta0.data.length) return;
+
+                    ctx.save();
+                    totData.forEach((total, i) => {
+                        if (!total || total === 0) return;
+                        const bar = meta0.data[i];
+                        if (!bar) return;
+
+                        const bx     = bar.x;
+                        const bw     = bar.width * 1.05; // Sedikit lebih lebar dari bar utama
+                        const top    = y.getPixelForValue(total);
+                        const bottom = y.getPixelForValue(0);
+                        const r      = 8; // border-radius
+
+                        // Fill background bar (warna mint transparent)
+                        ctx.fillStyle = 'rgba(110, 231, 183, 0.2)'; // Sangat soft mint green
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(bx - bw / 2 + r, top);
+                        ctx.lineTo(bx + bw / 2 - r, top);
+                        ctx.quadraticCurveTo(bx + bw / 2, top, bx + bw / 2, top + r);
+                        ctx.lineTo(bx + bw / 2, bottom);
+                        ctx.lineTo(bx - bw / 2, bottom);
+                        ctx.lineTo(bx - bw / 2, top + r);
+                        ctx.quadraticCurveTo(bx - bw / 2, top, bx - bw / 2 + r, top);
+                        ctx.closePath();
+                        ctx.fill();
+                    });
+                    ctx.restore();
+                }
+            };
+
             // ---- Render Chart.js (mixed: bar + line) ---------------------
             const trendCanvas = document.getElementById('chartTrending');
             if (trendCanvas) {
-                new Chart(trendCanvas, {
+                const chartInstance = new Chart(trendCanvas, {
                     type: 'bar',
+                    plugins: [totalBgPlugin],
                     data: {
                         labels: bulanLabels,
                         datasets: [
@@ -557,51 +702,58 @@
                                 label: 'Safe Action',
                                 type: 'bar',
                                 data: saData,
-                                backgroundColor: '#22c55e',
+                                backgroundColor: '#60a5fa', // soft blue
                                 stack: 'peka',
-                                borderRadius: { topLeft: 0, topRight: 0 },
                                 order: 2,
+                                barPercentage: 0.8,
+                                categoryPercentage: 0.85
                             },
                             {
                                 label: 'Safe Condition',
                                 type: 'bar',
                                 data: scData,
-                                backgroundColor: '#86efac',
+                                backgroundColor: '#fde047', // soft yellow
                                 stack: 'peka',
                                 order: 2,
+                                barPercentage: 0.8,
+                                categoryPercentage: 0.85
                             },
                             {
                                 label: 'Unsafe Action',
                                 type: 'bar',
                                 data: uaData,
-                                backgroundColor: '#f97316',
+                                backgroundColor: '#fdba74', // soft orange
                                 stack: 'peka',
                                 order: 2,
+                                barPercentage: 0.8,
+                                categoryPercentage: 0.85
                             },
                             {
                                 label: 'Unsafe Condition',
                                 type: 'bar',
                                 data: ucData,
-                                backgroundColor: '#ef4444',
+                                backgroundColor: '#6ee7b7', // soft mint green
                                 stack: 'peka',
-                                borderRadius: { topLeft: 3, topRight: 3 },
+                                borderRadius: { topLeft: 12, topRight: 12 },
                                 order: 2,
+                                barPercentage: 0.8,
+                                categoryPercentage: 0.85
                             },
                             // ---- Total Line ----
                             {
                                 label: 'Total',
                                 type: 'line',
                                 data: totData,
-                                borderColor: '#5AA2D7',
-                                backgroundColor: 'rgba(90, 162, 215, 0.08)',
-                                borderWidth: 2.5,
-                                pointBackgroundColor: '#5AA2D7',
+                                borderColor: '#fb3f6c', // pink/red
+                                backgroundColor: '#fb3f6c',
+                                borderWidth: 3,
+                                pointBackgroundColor: '#fb3f6c',
                                 pointBorderColor: '#fff',
                                 pointBorderWidth: 2,
-                                pointRadius: 5,
-                                pointHoverRadius: 7,
+                                pointRadius: 7,
+                                pointHoverRadius: 9,
                                 fill: false,
-                                tension: 0.3,
+                                tension: 0,
                                 order: 1,
                                 stack: undefined,
                             },
@@ -613,28 +765,34 @@
                         scales: {
                             x: {
                                 stacked: true,
-                                grid: { display: false },
-                                ticks: { font: { size: 11 } },
+                                grid: { display: false, drawBorder: false },
+                                ticks: { font: { size: 13, family: "'Inter', sans-serif" }, color: '#64748b' },
+                                border: { display: false }
                             },
                             y: {
                                 stacked: true,
                                 beginAtZero: true,
-                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                grid: { color: 'rgba(0,0,0,0.05)', drawBorder: false },
+                                border: { display: false },
                                 ticks: {
+                                    stepSize: 200,
                                     callback: (v) => v.toLocaleString('id-ID'),
-                                    font: { size: 11 },
+                                    font: { size: 12, family: "'Inter', sans-serif" },
+                                    color: '#64748b',
+                                    padding: 10
                                 },
+                                title: {
+                                    display: true,
+                                    text: 'Temuan',
+                                    font: { size: 14, family: "'Inter', sans-serif", weight: 'bold' },
+                                    color: '#64748b',
+                                    padding: { bottom: 15 }
+                                }
                             },
                         },
                         plugins: {
                             legend: {
-                                position: 'bottom',
-                                labels: {
-                                    padding: 14,
-                                    usePointStyle: true,
-                                    pointStyleWidth: 10,
-                                    font: { size: 11 },
-                                },
+                                display: false, // Disembunyikan, menggunakan custom HTML legend
                             },
                             tooltip: {
                                 callbacks: {
@@ -650,29 +808,27 @@
                         },
                     }
                 });
+                
+                // Simpan instance ke elemen untuk bisa diakses custom legend
+                trendCanvas.chartInstance = chartInstance;
             }
 
             // ---- Update Closing Rate Card ---------------------------------
-            const fmt   = (n) => n.toLocaleString('id-ID');
             const fmtPct = (r) => r.toLocaleString('id-ID', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
             });
 
             const crVal   = document.getElementById('closing-rate-value');
-            const crClose = document.getElementById('closing-rate-closed');
-            const crTotal = document.getElementById('closing-rate-total');
 
             if (crVal)   crVal.textContent   = annualTotal > 0 ? fmtPct(closingRate) + '%' : '—';
-            if (crClose) crClose.textContent = annualTotal > 0 ? fmt(closedTotal)            : '—';
-            if (crTotal) crTotal.textContent = annualTotal > 0 ? fmt(annualTotal)             : '—';
 
             // ---- Update Summary Text --------------------------------------
             const summaryEl = document.getElementById('trending-summary');
             if (summaryEl && annualTotal > 0) {
                 const pctStr   = fmtPct(closingRate).replace('.', ',');
-                const totalStr = fmt(annualTotal);
-                const closStr  = fmt(closedTotal);
+                const totalStr = annualTotal.toLocaleString('id-ID');
+                const closStr  = closedTotal.toLocaleString('id-ID');
                 summaryEl.innerHTML =
                     `<span class="text-slate-600 font-medium">&#9679;</span> `
                     + `Jumlah Pelaporan PEKA <strong>${totalStr} laporan</strong> `
@@ -917,21 +1073,61 @@
             options: { ...commonOptions, plugins: { legend: { position: 'right' } } }
         });
 
-        // Helper for Horizontal Bar charts with Data Labels
+        // Helper for Horizontal Bar charts with Data Labels (Percentages)
         const renderHorizontalBar = (ctxId, chartData, color) => {
-            const dataArr = Object.entries(chartData.data).map(([k, v]) => ({ label: k, value: v }));
+            // Sort from highest to lowest value
+            let dataArr = Object.entries(chartData.data)
+                .map(([k, v]) => ({ label: k, value: v }))
+                .sort((a, b) => b.value - a.value);
+            
+            const total = chartData.total || 1; // Prevent division by zero
             
             new Chart(document.getElementById(ctxId), {
                 type: 'bar',
                 data: { 
                     labels: dataArr.map(d => d.label), 
-                    datasets: [{ data: dataArr.map(d => d.value), backgroundColor: color }] 
+                    datasets: [{ 
+                        data: dataArr.map(d => ((d.value / total) * 100).toFixed(1)), 
+                        backgroundColor: color,
+                        borderWidth: 0,
+                        borderRadius: 4
+                    }] 
                 },
                 options: { 
                     ...commonOptions, 
                     indexAxis: 'y', 
-                    plugins: { legend: { display: false } }, 
-                    scales: { x: { beginAtZero: true, grid: { display: false } }, y: { grid: { display: false } } }
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let val = context.raw;
+                                    let rawCount = dataArr[context.dataIndex].value;
+                                    return ` ${val}% (${rawCount} temuan)`;
+                                }
+                            }
+                        }
+                    }, 
+                    scales: { 
+                        x: { 
+                            beginAtZero: true, 
+                            max: 100,
+                            grid: { display: true, color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }, 
+                        y: { 
+                            grid: { display: false },
+                            ticks: {
+                                autoSkip: false,
+                                font: { size: 11 }
+                            }
+                        } 
+                    }
                 }
             });
         };

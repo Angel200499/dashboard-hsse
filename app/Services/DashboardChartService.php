@@ -57,14 +57,14 @@ class DashboardChartService
      *                              Jika null, Reporting Rate menampilkan mode distribusi.
      * @return array
      */
-    public function getCharts(?string $fungsi = null, ?int $tahun = null, ?int $bulan = null): array
+    public function getCharts(?string $fungsi = null, ?int $tahun = null, ?int $bulan = null, ?int $pekaYear = null): array
     {
         return [
             'fungsi'            => $this->chartJumlahPerFungsi($fungsi, $tahun),
             'fungsi_info'       => $this->chartFungsiInfo($fungsi, $tahun),
             'reporting_lhd'     => $this->chartReportingRateLhd($tahun, $bulan),
             'reporting'         => $this->chartReportingRate($fungsi, $tahun, $bulan),
-            'trending'          => $this->chartTrendingTemuan($fungsi, $tahun),
+            'trending'          => $this->chartTrendingTemuan($fungsi, $pekaYear ?? $tahun),
             'kategori'          => $this->chartKategoriPeka($fungsi, $tahun),
             'keterlibatan'      => $this->chartKeterlibatan($fungsi, $tahun, $bulan),
             'persentase_fungsi' => $this->chartPersentaseFungsi($fungsi, $tahun),
@@ -651,7 +651,7 @@ class DashboardChartService
     {
         $categories = [
             'Inadequate PPE',
-            'Poor Housekeeping',
+            'Poor Housekeeping' => 'Poor house keeping',
             'Inadequate Integrity of Equipment',
             'Restricted Space of Action',
             'Inadequate Condition of Floor/Surface',
@@ -684,15 +684,18 @@ class DashboardChartService
         $data  = [];
         $total = 0;
 
-        foreach ($categories as $cat) {
+        foreach ($categories as $key => $val) {
+            $label = is_string($key) ? $key : $val;
+            $search = $val;
+
             $count = $this->baseQuery($fungsi, $tahun)
                 ->whereRaw(
                     "LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.{$jsonKey}'))) LIKE ?",
-                    ['%' . strtolower($cat) . '%']
+                    ['%' . strtolower($search) . '%']
                 )
                 ->count();
 
-            $data[$cat] = $count;
+            $data[$label] = $count;
             $total     += $count;
         }
 
@@ -743,7 +746,6 @@ class DashboardChartService
         $this->applyRekapPeriodeFilter($query, $periode, $bulan, $tahun);
 
         // 3. Filter nama pelapor (WHERE sebelum GROUP BY, pada kolom JSON)
-        //    Menggunakan WHERE pada kolom source agar index dapat digunakan
         if (!empty(trim($search))) {
             $query->whereRaw(
                 "TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))) LIKE ?",
@@ -751,41 +753,78 @@ class DashboardChartService
             );
         }
 
-        // 4. Query GROUP BY pelapor + COUNT DISTINCT id_temuan
-        //    COALESCE agar pelapor null/kosong muncul sebagai "Tidak Diketahui"
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        // 4. Satu query GROUP BY (pelapor, bulan) — COUNT(DISTINCT id_temuan)
+        //    Hasilnya dipakai untuk membangun monthly[] per pelapor sekaligus total keseluruhan.
         $rows = $query
             ->selectRaw("
                 COALESCE(
                     NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), ''),
                     'Tidak Diketahui'
                 ) AS pelapor,
-                COUNT(DISTINCT id_temuan) AS jumlah
+                MONTH(STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i')) AS bulan_ke,
+                COUNT(DISTINCT id_temuan) AS jumlah_bulan
             ")
-            ->groupBy(DB::raw("
-                COALESCE(
-                    NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), ''),
-                    'Tidak Diketahui'
-                )
-            "))
-            ->orderByDesc('jumlah')
-            ->orderBy(DB::raw("
-                COALESCE(
-                    NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), ''),
-                    'Tidak Diketahui'
-                )
-            "), 'asc')
+            ->groupBy(
+                DB::raw("COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), ''), 'Tidak Diketahui')"),
+                DB::raw("MONTH(STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i'))")
+            )
             ->get();
 
-        $rekap          = $rows->map(fn ($r) => ['pelapor' => $r->pelapor, 'jumlah' => (int) $r->jumlah])->all();
-        $totalPelaporan = array_sum(array_column($rekap, 'jumlah'));
+        // 5. Bangun lookup: pelapor -> [bulan -> jumlah] dan hitung total per pelapor
+        $monthlyLookup = [];   // ['NamaPelapor'][1..12] = jumlah
+        $pelaporTotal  = [];   // ['NamaPelapor'] = jumlah_total
+
+        foreach ($rows as $r) {
+            $bln  = (int) $r->bulan_ke;
+            $nama = $r->pelapor;
+            $jml  = (int) $r->jumlah_bulan;
+
+            if ($bln >= 1 && $bln <= 12) {
+                $monthlyLookup[$nama][$bln] = $jml;
+                $pelaporTotal[$nama]        = ($pelaporTotal[$nama] ?? 0) + $jml;
+            }
+        }
+
+        // Urutkan pelapor: terbanyak laporan dulu, kemudian abjad
+        arsort($pelaporTotal);
+
+        // 6. Bangun array rekap dengan data bulanan lengkap Jan–Des
+        $rekap = [];
+        foreach ($pelaporTotal as $nama => $total) {
+            $monthly = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $monthly[$m] = $monthlyLookup[$nama][$m] ?? 0;
+            }
+            $rekap[] = [
+                'pelapor'      => $nama,
+                'jumlah'       => $total,   // backward-compat untuk KPI
+                'jumlah_total' => $total,
+                'monthly'      => $monthly,
+            ];
+        }
+
+        // 7. Hitung monthly_totals — jumlah semua pelapor per bulan
+        $monthlyTotals = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $sum = 0;
+            foreach ($rekap as $row) {
+                $sum += $row['monthly'][$m];
+            }
+            $monthlyTotals[$m] = $sum;
+        }
+
+        $totalPelaporan = array_sum(array_column($rekap, 'jumlah_total'));
         $totalPelapor   = count($rekap);
 
         $pelapor_terbanyak = !empty($rekap)
-            ? ['nama' => $rekap[0]['pelapor'], 'jumlah' => $rekap[0]['jumlah']]
+            ? ['nama' => $rekap[0]['pelapor'], 'jumlah' => $rekap[0]['jumlah_total']]
             : ['nama' => '-', 'jumlah' => 0];
 
         return [
             'rekap'             => $rekap,
+            'monthly_totals'    => $monthlyTotals,
             'total_pelaporan'   => $totalPelaporan,
             'total_pelapor'     => $totalPelapor,
             'pelapor_terbanyak' => $pelapor_terbanyak,

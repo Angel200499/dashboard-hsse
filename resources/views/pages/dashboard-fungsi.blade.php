@@ -208,7 +208,7 @@
         </div>
 
         <!-- Chart 7: Unsafe Action (Horizontal Bar) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[500px]">
             <h3 class="text-base font-bold text-slate-800 mb-4">7. Unsafe Action Category</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart7"></canvas>
@@ -216,7 +216,7 @@
         </div>
 
         <!-- Chart 8: Unsafe Condition (Horizontal Bar) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[500px]">
             <h3 class="text-base font-bold text-slate-800 mb-4">8. Unsafe Condition Category</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart8"></canvas>
@@ -787,21 +787,61 @@
             options: { ...commonOptions, plugins: { legend: { position: 'right' } } }
         });
 
-        // Helper for Horizontal Bar charts with Data Labels
+        // Helper for Horizontal Bar charts with Data Labels (Percentages)
         const renderHorizontalBar = (ctxId, chartData, color) => {
-            const dataArr = Object.entries(chartData.data).map(([k, v]) => ({ label: k, value: v }));
+            // Sort from highest to lowest value
+            let dataArr = Object.entries(chartData.data)
+                .map(([k, v]) => ({ label: k, value: v }))
+                .sort((a, b) => b.value - a.value);
+            
+            const total = chartData.total || 1; // Prevent division by zero
             
             new Chart(document.getElementById(ctxId), {
                 type: 'bar',
                 data: { 
                     labels: dataArr.map(d => d.label), 
-                    datasets: [{ data: dataArr.map(d => d.value), backgroundColor: color }] 
+                    datasets: [{ 
+                        data: dataArr.map(d => ((d.value / total) * 100).toFixed(1)), 
+                        backgroundColor: color,
+                        borderWidth: 0,
+                        borderRadius: 4
+                    }] 
                 },
                 options: { 
                     ...commonOptions, 
                     indexAxis: 'y', 
-                    plugins: { legend: { display: false } }, 
-                    scales: { x: { beginAtZero: true, grid: { display: false } }, y: { grid: { display: false } } }
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let val = context.raw;
+                                    let rawCount = dataArr[context.dataIndex].value;
+                                    return ` ${val}% (${rawCount} temuan)`;
+                                }
+                            }
+                        }
+                    }, 
+                    scales: { 
+                        x: { 
+                            beginAtZero: true, 
+                            max: 100,
+                            grid: { display: true, color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }, 
+                        y: { 
+                            grid: { display: false },
+                            ticks: {
+                                autoSkip: false,
+                                font: { size: 11 }
+                            }
+                        } 
+                    }
                 }
             });
         };

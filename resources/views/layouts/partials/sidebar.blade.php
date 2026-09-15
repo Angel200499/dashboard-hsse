@@ -22,6 +22,14 @@
                 </a>
 
                 <div class="mt-2 space-y-1 pl-4 border-l-2 border-slate-100 ml-5">
+                    @if(auth()->user()->role === 'Admin HSSE')
+                        @php $isGmActive = request()->is('dashboard/temuan-gm'); @endphp
+                        <a class="flex items-center px-3 py-2 transition-colors rounded-r-lg {{ $isGmActive ? 'bg-[#9DBF2A]/10 text-[#9DBF2A] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700' }}" href="{{ route('dashboard.temuan-gm') }}">
+                            <div class="w-1.5 h-1.5 rounded-full mr-3 {{ $isGmActive ? 'bg-[#9DBF2A]' : 'bg-slate-300' }}"></div>
+                            <span class="text-sm">Temuan GM</span>
+                        </a>
+                    @endif
+
                     @foreach(['Operation', 'Maintenance', 'HSSE', 'Business Support'] as $fn)
                     @php $isActive = request()->is('dashboard/fungsi/'.strtolower($fn)); @endphp
                     <a class="flex items-center px-3 py-2 transition-colors rounded-r-lg {{ $isActive ? 'bg-[#9DBF2A]/10 text-[#9DBF2A] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700' }}" href="{{ route('dashboard.fungsi', $fn) }}">

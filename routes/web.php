@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\SipekaImportController;
 use App\Http\Controllers\SipekaFindingController;
+use App\Http\Controllers\GmFindingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
@@ -42,6 +43,10 @@ Route::middleware('auth')->group(function () {
     // Dashboard Function — semua role bisa akses (otorisasi di controller)
     Route::get('/dashboard/fungsi/{nama_fungsi?}', [DashboardFunctionController::class, 'index'])
          ->name('dashboard.fungsi');
+
+    // Temuan GM — khusus Superadmin
+    Route::get('/dashboard/temuan-gm', [GmFindingController::class, 'index'])
+         ->name('dashboard.temuan-gm');
 
 
 

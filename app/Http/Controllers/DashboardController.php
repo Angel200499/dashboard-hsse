@@ -32,6 +32,13 @@ class DashboardController extends Controller
                          ? (int) $bulanRaw
                          : null;
 
+        // Filter Tahun mandiri untuk Rekap PEKA
+        // Default ke tahun sekarang agar chart langsung tampil saat pertama buka
+        $pekaYearRaw = $request->get('peka_year');
+        $pekaYear    = ($pekaYearRaw && preg_match('/^\d{4}$/', $pekaYearRaw))
+                       ? (int) $pekaYearRaw
+                       : (int) now()->year;
+
         // -----------------------------------------------------------------
         // KPI — dihitung via SQL CASE WHEN (computed monitoring status)
         // Difilter by tahun jika ada.
@@ -70,12 +77,13 @@ class DashboardController extends Controller
         // Charts — DashboardChartService, difilter by tahun + bulan
         // $fungsi = null → Global Dashboard (semua fungsi)
         // -----------------------------------------------------------------
-        $charts = $this->chartService->getCharts(null, $tahun, $bulan);
+        $charts = $this->chartService->getCharts(null, $tahun, $bulan, $pekaYear);
 
         // Filter yang dipilih dikirim ke view untuk UI
-        $selectedYear  = $tahun;
-        $selectedMonth = $bulan;
+        $selectedYear     = $tahun;
+        $selectedMonth    = $bulan;
+        $selectedPekaYear = $pekaYear;
 
-        return view('pages.dashboard', compact('kpi', 'charts', 'selectedYear', 'selectedMonth'));
+        return view('pages.dashboard', compact('kpi', 'charts', 'selectedYear', 'selectedMonth', 'selectedPekaYear'));
     }
 }

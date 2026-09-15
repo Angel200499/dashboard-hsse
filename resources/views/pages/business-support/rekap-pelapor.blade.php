@@ -19,7 +19,7 @@
                 </svg>
                 Rekap Pelapor
             </h1>
-            <p class="text-sm text-slate-500 mt-1">Rekap jumlah temuan yang dilaporkan oleh masing-masing pelapor pada fungsi <strong>Business Support</strong>.</p>
+            <p class="text-sm text-slate-500 mt-1">Rekap jumlah temuan per bulan oleh masing-masing pelapor pada fungsi <strong>Business Support</strong>.</p>
         </div>
 
         {{-- Tombol Download PDF --}}
@@ -171,12 +171,12 @@
 
     </div>
 
-    {{-- ===== TABEL REKAP ===== --}}
+    {{-- ===== TABEL REKAP BULANAN ===== --}}
     <div class="bg-white border border-slate-200 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden">
         <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
             <div>
-                <h3 class="text-lg font-bold text-slate-800">Daftar Pelapor</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Diurutkan berdasarkan jumlah laporan terbanyak</p>
+                <h3 class="text-lg font-bold text-slate-800">Rekap Bulanan Pelapor</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Jumlah temuan per pelapor per bulan (Jan-Des)</p>
             </div>
             <div class="flex items-center gap-2">
                 @if($rekapSearch)
@@ -202,57 +202,46 @@
                 <p class="text-sm text-slate-400">Belum ada data pelaporan Business Support pada periode yang dipilih.</p>
             </div>
         @else
+            {{-- Horizontal scroll agar tabel 15 kolom tidak merusak layout --}}
             <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left text-slate-600">
-                    <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200 sticky top-0">
+                <table class="w-full text-sm text-slate-600" style="min-width:900px;">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200">
                         <tr>
-                            <th class="px-6 py-4 font-semibold text-center w-16">No</th>
-                            <th class="px-6 py-4 font-semibold">Pelapor</th>
-                            <th class="px-6 py-4 font-semibold text-right">Jumlah Laporan</th>
+                            <th class="px-4 py-3 font-semibold text-center w-12">No</th>
+                            <th class="px-4 py-3 font-semibold text-left" style="min-width:120px;">Fungsi</th>
+                            <th class="px-4 py-3 font-semibold text-left" style="min-width:180px;">Nama</th>
+                            @foreach(['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'] as $bln)
+                                <th class="px-2 py-3 font-semibold text-right" style="min-width:44px;">{{ $bln }}</th>
+                            @endforeach
+                            <th class="px-3 py-3 font-semibold text-right bg-slate-200 text-slate-800" style="min-width:56px;">Total</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($rekapPelapor['rekap'] as $idx => $row)
-                            <tr class="border-b border-slate-100 {{ $idx === 0 ? 'bg-amber-50/60' : 'bg-white hover:bg-slate-50' }} transition-colors">
-                                <td class="px-6 py-4 text-center">
-                                    @if($idx === 0)
-                                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400 text-amber-900 text-xs font-bold shadow-sm">1</span>
-                                    @else
-                                        <span class="text-slate-400 font-medium">{{ $idx + 1 }}</span>
-                                    @endif
+                            <tr class="border-b border-slate-100 {{ $idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50' }} hover:bg-amber-50/40 transition-colors">
+                                <td class="px-4 py-3 text-center">
+                                    <span class="text-slate-400 font-medium text-xs">{{ $idx + 1 }}</span>
                                 </td>
-                                <td class="px-6 py-4 font-medium {{ $idx === 0 ? 'text-amber-900' : 'text-slate-800' }}">
-                                    @if($idx === 0)
-                                        <span class="flex items-center gap-2">
-                                            <svg class="w-4 h-4 text-amber-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                                            {{ $row['pelapor'] }}
-                                        </span>
-                                    @else
-                                        {{ $row['pelapor'] }}
-                                    @endif
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold" style="background:#f3f9e0;color:#4a6a0a;">Business Support</span>
                                 </td>
-                                <td class="px-6 py-4 text-right">
-                                    <span class="inline-flex items-center justify-end gap-1.5">
-                                        <span class="font-bold text-base {{ $idx === 0 ? 'text-amber-700' : 'text-slate-700' }}">{{ number_format($row['jumlah']) }}</span>
-                                        @php
-                                            $pct = $rekapPelapor['total_pelaporan'] > 0
-                                                ? round(($row['jumlah'] / $rekapPelapor['total_pelaporan']) * 100, 1)
-                                                : 0;
-                                        @endphp
-                                        <span class="text-xs text-slate-400">({{ $pct }}%)</span>
-                                    </span>
-                                </td>
+                                <td class="px-4 py-3 font-medium text-slate-800">{{ $row['pelapor'] }}</td>
+                                @for($m = 1; $m <= 12; $m++)
+                                    @php $val = $row['monthly'][$m] ?? 0; @endphp
+                                    <td class="px-2 py-3 text-right {{ $val > 0 ? 'font-semibold text-slate-800' : 'text-slate-300' }}">{{ $val > 0 ? number_format($val) : '0' }}</td>
+                                @endfor
+                                <td class="px-3 py-3 text-right font-bold text-slate-900 bg-slate-100">{{ number_format($row['jumlah_total']) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                     <tfoot>
                         <tr class="bg-slate-800 text-white">
-                            <td class="px-6 py-4 text-center font-semibold" colspan="2">
-                                <span class="text-sm uppercase tracking-wide">Total</span>
-                            </td>
-                            <td class="px-6 py-4 text-right font-bold text-lg">
-                                {{ number_format($rekapPelapor['total_pelaporan']) }}
-                            </td>
+                            <td class="px-4 py-3 text-center"></td>
+                            <td class="px-4 py-3 font-semibold text-xs uppercase tracking-wide" colspan="2">Total</td>
+                            @for($m = 1; $m <= 12; $m++)
+                                <td class="px-2 py-3 text-right font-bold">{{ number_format($rekapPelapor['monthly_totals'][$m] ?? 0) }}</td>
+                            @endfor
+                            <td class="px-3 py-3 text-right font-bold" style="background:#7a9920;">{{ number_format($rekapPelapor['total_pelaporan']) }}</td>
                         </tr>
                     </tfoot>
                 </table>

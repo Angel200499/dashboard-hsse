@@ -184,7 +184,8 @@ class DashboardFunctionController extends Controller
             'rekapTahun'    => $rekapTahun,
             'rekapSearch'   => $rekapSearch,
             'generatedAt'   => now()->format('d/m/Y H:i'),
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper('a4', 'landscape');
+
 
         // Nama file dinamis berdasarkan periode
         $filename = $this->buildPdfFilename($rekapPeriode, $rekapBulan, $rekapTahun);
