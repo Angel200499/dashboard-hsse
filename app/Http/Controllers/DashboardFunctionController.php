@@ -65,6 +65,19 @@ class DashboardFunctionController extends Controller
         $bulan         = ($bulanRaw && is_numeric($bulanRaw) && (int) $bulanRaw >= 1 && (int) $bulanRaw <= 12)
                          ? (int) $bulanRaw
                          : null;
+
+        // -----------------------------------------------------------------
+        // VALIDASI PERIODE REPORTING RATE
+        // Ambil max bulan SIPEKA aktual untuk tahun yang dipilih.
+        // Jika user mengirim bulan melebihi max (mis. via URL bypass),
+        // clamp ke max bulan yang valid.
+        // -----------------------------------------------------------------
+        $maxBulanSipeka = $tahun ? SipekaFinding::maxBulanTahun($tahun) : null;
+
+        if ($bulan !== null && $maxBulanSipeka !== null && $bulan > $maxBulanSipeka) {
+            $bulan = $maxBulanSipeka;
+        }
+
         $selectedMonth = $bulan;
 
         // -----------------------------------------------------------------
@@ -140,7 +153,8 @@ class DashboardFunctionController extends Controller
             'findingsPaginated',
             'fungsi',
             'selectedYear',
-            'selectedMonth'
+            'selectedMonth',
+            'maxBulanSipeka'   // batas atas bulan Reporting Rate berdasarkan data SIPEKA aktual
         ));
     }
 

@@ -45,6 +45,13 @@
                         9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
                     ];
                     $tahunList = range(now()->year + 1, 2020);
+
+                    // Dropdown bulan khusus Reporting Rate — hanya tampilkan bulan yang
+                    // benar-benar memiliki data SIPEKA pada tahun yang dipilih.
+                    // $maxBulanSipeka dikirim dari DashboardFunctionController.
+                    $rrBulanList = ($maxBulanSipeka ?? null)
+                        ? array_filter($bulanNamaList, fn($num) => $num <= $maxBulanSipeka, ARRAY_FILTER_USE_KEY)
+                        : $bulanNamaList;
                 @endphp
 
                 <select name="year" onchange="document.getElementById('month-filter').value=''; this.form.submit()"
@@ -59,7 +66,8 @@
                     class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm {{ !$selectedYear ? 'opacity-50' : '' }}"
                     {{ !$selectedYear ? 'disabled' : '' }}>
                     <option value="">Semua Bulan</option>
-                    @foreach($bulanNamaList as $num => $nama)
+                    {{-- $rrBulanList hanya berisi bulan yang memiliki data SIPEKA aktual --}}
+                    @foreach($rrBulanList as $num => $nama)
                         <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
                     @endforeach
                 </select>

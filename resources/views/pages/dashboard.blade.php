@@ -32,6 +32,8 @@
 
     {{-- ================================================================
          $bulanNamaList & $tahunList — dipakai oleh filter in-card
+         $rrBulanList  — subset $bulanNamaList untuk Reporting Rate:
+                         dibatasi sampai max bulan SIPEKA aktual tahun ini.
     ================================================================ --}}
     @php
         $bulanNamaList = [
@@ -40,6 +42,13 @@
             9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
         ];
         $tahunList = range(now()->year + 1, 2020);
+
+        // Dropdown bulan khusus Reporting Rate — hanya tampilkan bulan yang
+        // benar-benar memiliki data SIPEKA pada tahun yang dipilih.
+        // $maxBulanSipeka dikirim dari controller (null jika tahun belum dipilih).
+        $rrBulanList = ($maxBulanSipeka ?? null)
+            ? array_filter($bulanNamaList, fn($num) => $num <= $maxBulanSipeka, ARRAY_FILTER_USE_KEY)
+            : $bulanNamaList; // fallback: tampilkan semua jika tahun belum dipilih
     @endphp
 
     <!-- KPI Cards -->
@@ -201,7 +210,8 @@
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm {{ !($selectedYear ?? null) ? 'opacity-50' : '' }}"
                         {{ !($selectedYear ?? null) ? 'disabled' : '' }}>
                         <option value="">Semua Bulan</option>
-                        @foreach($bulanNamaList as $num => $nama)
+                        {{-- $rrBulanList hanya berisi bulan yang memiliki data SIPEKA aktual --}}
+                        @foreach($rrBulanList as $num => $nama)
                             <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
                         @endforeach
                     </select>

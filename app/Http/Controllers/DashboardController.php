@@ -26,11 +26,25 @@ class DashboardController extends Controller
         $tahun    = ($tahunRaw && preg_match('/^\d{4}$/', $tahunRaw)) ? (int) $tahunRaw : null;
 
         // Validasi filter bulan (1–12) — hanya aktif jika tahun juga dipilih
-        $bulanRaw      = $request->get('month');
-        $bulan         = ($tahun && $bulanRaw && is_numeric($bulanRaw)
-                          && (int) $bulanRaw >= 1 && (int) $bulanRaw <= 12)
-                         ? (int) $bulanRaw
-                         : null;
+        $bulanRaw = $request->get('month');
+        $bulan    = ($tahun && $bulanRaw && is_numeric($bulanRaw)
+                     && (int) $bulanRaw >= 1 && (int) $bulanRaw <= 12)
+                    ? (int) $bulanRaw
+                    : null;
+
+        // -----------------------------------------------------------------
+        // VALIDASI PERIODE REPORTING RATE
+        // Ambil max bulan SIPEKA aktual untuk tahun yang dipilih.
+        // Jika user mengirim bulan melebihi max (mis. via URL bypass),
+        // clamp ke max bulan yang valid. Ini mencegah kalkulasi Reporting Rate
+        // dengan data yang belum tersedia.
+        // -----------------------------------------------------------------
+        $maxBulanSipeka = $tahun ? SipekaFinding::maxBulanTahun($tahun) : null;
+
+        if ($bulan !== null && $maxBulanSipeka !== null && $bulan > $maxBulanSipeka) {
+            // Bulan yang diminta melebihi data aktual — clamp ke max yang valid
+            $bulan = $maxBulanSipeka;
+        }
 
         // Filter Tahun mandiri untuk Rekap PEKA
         // Default ke tahun sekarang agar chart langsung tampil saat pertama buka
@@ -84,6 +98,10 @@ class DashboardController extends Controller
         $selectedMonth    = $bulan;
         $selectedPekaYear = $pekaYear;
 
-        return view('pages.dashboard', compact('kpi', 'charts', 'selectedYear', 'selectedMonth', 'selectedPekaYear'));
+        return view('pages.dashboard', compact(
+            'kpi', 'charts',
+            'selectedYear', 'selectedMonth', 'selectedPekaYear',
+            'maxBulanSipeka'   // batas atas bulan Reporting Rate berdasarkan data SIPEKA aktual
+        ));
     }
 }

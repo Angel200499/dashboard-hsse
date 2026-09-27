@@ -65,6 +65,33 @@ class SipekaFinding extends Model
     // -----------------------------------------------------------------
 
     /**
+     * Ambil bulan terakhir (1–12) yang benar-benar memiliki data temuan SIPEKA
+     * untuk tahun yang diberikan.
+     *
+     * Digunakan oleh controller untuk:
+     *   1. Membatasi dropdown bulan Reporting Rate agar hanya menampilkan
+     *      bulan yang memiliki data aktual.
+     *   2. Validasi backend — menolak request bulan yang melebihi max bulan.
+     *
+     * Menggunakan JSON extraction yang identik dengan ytdQuery() di
+     * DashboardChartService agar konsisten.
+     *
+     * @param  int  $tahun  Tahun 4 digit (mis. 2026)
+     * @return int|null     Nomor bulan terakhir (1–12), atau null jika tidak ada data
+     */
+    public static function maxBulanTahun(int $tahun): ?int
+    {
+        $tc = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        $row = static::query()
+            ->selectRaw("MAX(MONTH(STR_TO_DATE({$tc}, '%Y-%m-%d %H:%i'))) AS max_bulan")
+            ->whereRaw("{$tc} LIKE ?", ["{$tahun}%"])
+            ->first();
+
+        return $row?->max_bulan !== null ? (int) $row->max_bulan : null;
+    }
+
+    /**
      * Filter berdasarkan fungsi (dari JSON column data_sipeka->fungsi).
      */
     public function scopeByFungsi(Builder $query, string $fungsi): Builder
