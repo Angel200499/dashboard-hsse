@@ -216,17 +216,17 @@
         </div>
 
         <!-- Chart 7: Unsafe Action (Horizontal Bar) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[500px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">7. Unsafe Action Category</h3>
-            <div class="flex-1 relative w-full h-full">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="height:340px">
+            <h3 class="text-base font-bold text-slate-800 mb-3">7. Unsafe Action Category</h3>
+            <div class="flex-1 relative w-full" style="min-height:0">
                 <canvas id="chart7"></canvas>
             </div>
         </div>
 
         <!-- Chart 8: Unsafe Condition (Horizontal Bar) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[500px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">8. Unsafe Condition Category</h3>
-            <div class="flex-1 relative w-full h-full">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="height:600px">
+            <h3 class="text-base font-bold text-slate-800 mb-3">8. Unsafe Condition Category</h3>
+            <div class="flex-1 relative w-full" style="min-height:0">
                 <canvas id="chart8"></canvas>
             </div>
         </div>
@@ -796,11 +796,12 @@
         });
 
         // Helper for Horizontal Bar charts with Data Labels (Percentages)
+        // Urutan kategori mengikuti backend (PHP array order) — TIDAK di-sort by value.
         const renderHorizontalBar = (ctxId, chartData, color) => {
-            // Sort from highest to lowest value
+            // Pertahankan urutan dari backend (PHP array order)
             let dataArr = Object.entries(chartData.data)
-                .map(([k, v]) => ({ label: k, value: v }))
-                .sort((a, b) => b.value - a.value);
+                .map(([k, v]) => ({ label: k, value: v }));
+            // CATATAN: tidak ada .sort() — urutan ditentukan oleh backend service
             
             const total = chartData.total || 1; // Prevent division by zero
             
@@ -846,7 +847,7 @@
                             grid: { display: false },
                             ticks: {
                                 autoSkip: false,
-                                font: { size: 11 }
+                                font: { size: 9.5 }  // label bilingual lebih panjang
                             }
                         } 
                     }

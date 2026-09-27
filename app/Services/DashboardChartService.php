@@ -629,16 +629,27 @@ class DashboardChartService
 
     /**
      * Chart 7 — Unsafe Action Category (Horizontal Bar).
+     *
+     * 6 kategori dengan urutan dan label bilingual TETAP sesuai referensi.
+     * Urutan ini tidak boleh diubah berdasarkan nilai/sorting apapun.
      */
     private function chartUnsafeAction(?string $fungsi, ?int $tahun): array
     {
         $categories = [
-            'Failure to Follow Procedure',
-            'Using Improper PPE',
-            'Improper Position for Task',
-            'Improper Placement',
-            'Operating Out of Standard',
-            'Using Defective Tools/Equipments',
+            // key = label yang ditampilkan di chart
+            // value = string yang di-LIKE ke kolom unsafe_action di JSON
+            'Tidak mengikuti Prosedur / Failure to follow procedure'
+                => 'Failure to Follow Procedure',
+            'Tidak menggunakan APD yang standard / Using improper PPE'
+                => 'Using Improper PPE',
+            'Posisi kerja yang tidak tepat / Improper position for task'
+                => 'Improper Position for Task',
+            'Penempatan tidak sesuai / Improper Placement'
+                => 'Improper Placement',
+            'Mengoperasikan diluar standar/operating out of standard'
+                => 'Operating Out of Standard',
+            'Menggunakan peralatan yang tidak standard/rusak / Using defective tools/equipments'
+                => 'Using Defective Tools/Equipments',
         ];
 
         return $this->buildCategoryChart('unsafe_action', $categories, $fungsi, $tahun);
@@ -646,22 +657,41 @@ class DashboardChartService
 
     /**
      * Chart 8 — Unsafe Condition Category (Horizontal Bar).
+     *
+     * 12 kategori dengan urutan dan label bilingual TETAP sesuai referensi.
+     * Urutan ini tidak boleh diubah berdasarkan nilai/sorting apapun.
+     *
+     * Catatan: kolom Excel menggunakan typo "unsafe_conditon" (tanpa 'i' kedua).
      */
     private function chartUnsafeCondition(?string $fungsi, ?int $tahun): array
     {
         $categories = [
-            'Inadequate PPE',
-            'Poor Housekeeping' => 'Poor house keeping',
-            'Inadequate Integrity of Equipment',
-            'Restricted Space of Action',
-            'Inadequate Condition of Floor/Surface',
-            'Incorrect Material',
-            'Inadequate Operation Mode',
-            'Inadequate Guards/Barriers',
-            'Improper Measurement',
-            'Defective Tools/Equipments',
-            'Incorrect Tools/Equipments',
-            'Inadequate Warning System',
+            // key = label yang ditampilkan di chart
+            // value = string yang di-LIKE ke kolom unsafe_conditon di JSON
+            'Rambu-rambu yang tidak cukup/ Inadequate warning system'
+                => 'Inadequate Warning System',
+            'Peralatan yang tidak sesuai/ Incorrect tools/equipments'
+                => 'Incorrect Tools/Equipments',
+            'Peralatan yang rusak / Defective tools/equipments'
+                => 'Defective Tools/Equipments',
+            'Pengukuran yang tidak tepat/Improper measurement'
+                => 'Improper Measurement',
+            'Pengaman yang tidak cukup/Inadequate Guards/Barriers'
+                => 'Inadequate Guards/Barriers',
+            'Mode operasi yang tidak layak / Inadequate operation mode'
+                => 'Inadequate Operation Mode',
+            'Material yang tidak tepat / Incorrect material'
+                => 'Incorrect Material',
+            'Kondisi lantai/permukaan tidak layak / Inadequate condition of floor/surface'
+                => 'Inadequate Condition of Floor/Surface',
+            'Keterbatasan ruangan untuk kerja / Restricted space of action'
+                => 'Restricted Space of Action',
+            'Integritas peralatan yang tidak layak/ Inadequate integrity of equipment'
+                => 'Inadequate Integrity of Equipment',
+            'Housekeeping yang tidak baik / Poor house keeping order'
+                => 'Poor Housekeeping',
+            'APD yang tidak cukup / Inadequate PPE'
+                => 'Inadequate PPE',
         ];
 
         // Catatan: kolom Excel menggunakan typo "unsafe_conditon" (tanpa 'i')
