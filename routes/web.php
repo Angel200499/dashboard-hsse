@@ -28,6 +28,8 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard Global — hanya HSSE roles (Function roles di-redirect di controller)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/executive-summary/pdf', [DashboardController::class, 'exportExecutiveSummaryPdf'])
+         ->name('dashboard.executive-summary.pdf');
 
     // Export PDF Rekap Pelapor Business Support
     // Route ini HARUS didefinisikan SEBELUM route fungsi wildcard agar tidak tertangkap sebagai {nama_fungsi}

@@ -104,4 +104,21 @@ class DashboardController extends Controller
             'maxBulanSipeka'   // batas atas bulan Reporting Rate berdasarkan data SIPEKA aktual
         ));
     }
+
+    /**
+     * Export Executive Summary PDF (2 Pages) matching Mentor Reference.
+     */
+    public function exportExecutiveSummaryPdf(Request $request, \App\Services\ExecutiveSummaryPdfService $pdfService)
+    {
+        $tahunRaw = $request->get('year');
+        $tahun    = ($tahunRaw && preg_match('/^\d{4}$/', $tahunRaw)) ? (int) $tahunRaw : (int) now()->year;
+
+        $bulanRaw = $request->get('month');
+        $bulan    = ($bulanRaw && is_numeric($bulanRaw)) ? (int) $bulanRaw : null;
+
+        $pdf = $pdfService->generate($tahun, $bulan);
+
+        $filename = "PEKA_Report_ytd_{$tahun}" . ($bulan ? "_{$bulan}" : "") . ".pdf";
+        return $pdf->download($filename);
+    }
 }

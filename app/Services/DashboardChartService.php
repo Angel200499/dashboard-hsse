@@ -74,6 +74,303 @@ class DashboardChartService
         ];
     }
 
+    /**
+     * Ambil data chart khusus untuk Executive Summary PDF (YTD cutoff s/d bulan terpilih).
+     *
+     * ISOLATED METHOD: TIDAK mengubah behavior getCharts() atau baseQuery() yang digunakan dashboard web.
+     * Semua seksi dihitung dengan cutoff Januari s/d $bulan pada $tahun yang dipilih.
+     * Section 2 (Reporting Rate) dan Section 6 (Keterlibatan) mereuse method existing yang sudah benar.
+     *
+     * @param  string|null $fungsi null = global (semua fungsi)
+     * @param  int         $tahun  4-digit year
+     * @param  int         $bulan  1–12 bulan cutoff
+     * @return array
+     */
+    public function getChartsYtd(?string $fungsi = null, int $tahun = 2026, int $bulan = 12): array
+    {
+        return [
+            'fungsi'            => $this->chartJumlahPerFungsi($fungsi, $tahun),
+            'fungsi_info'       => $this->chartFungsiInfo($fungsi, $tahun),
+            'reporting_lhd'     => $this->chartReportingRateLhd($tahun, $bulan),
+            'reporting'         => $this->chartReportingRate($fungsi, $tahun, $bulan),
+            'trending'          => $this->chartTrendingTemuanYtd($fungsi, $tahun, $bulan),
+            'kategori'          => $this->chartKategoriPekaYtd($fungsi, $tahun, $bulan),
+            'keterlibatan'      => $this->chartKeterlibatan($fungsi, $tahun, $bulan),
+            'persentase_fungsi' => $this->chartPersentaseFungsiYtd($fungsi, $tahun, $bulan),
+            'tindak_lanjut'     => $this->chartTindakLanjutYtd($fungsi, $tahun, $bulan),
+            'unsafe_action'     => $this->chartUnsafeActionYtd($fungsi, $tahun, $bulan),
+            'unsafe_condition'  => $this->chartUnsafeConditionYtd($fungsi, $tahun, $bulan),
+        ];
+    }
+
+    /**
+     * Chart Trending Temuan YTD khusus Executive Summary PDF.
+     *
+     * Menampilkan 12 bulan (Jan–Des). Bulan s/d $bulan berisi data aktual,
+     * bulan setelah $bulan bernilai 0 (tidak ada data masa depan yang bocor).
+     * annual_total, closed_total, dan closing_rate dihitung kumulatif Jan–$bulan.
+     */
+    private function chartTrendingTemuanYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $bulanLabels = [
+            1 => 'Jan', 2 => 'Feb', 3  => 'Mar', 4  => 'Apr',
+            5 => 'Mei', 6 => 'Jun', 7  => 'Jul', 8  => 'Agu',
+            9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
+        ];
+
+        $emptyMonth = [
+            'safe_action'      => 0,
+            'safe_condition'   => 0,
+            'unsafe_action'    => 0,
+            'unsafe_condition' => 0,
+            'total'            => 0,
+        ];
+        $monthlyData = [];
+        for ($i = 1; $i <= 12; $i++) {
+            $monthlyData[$i] = ['month' => $bulanLabels[$i]] + $emptyMonth;
+        }
+
+        $kategoriMap = [
+            'Tindakan aman'       => 'safe_action',
+            'Kondisi aman'        => 'safe_condition',
+            'Tindakan tidak aman' => 'unsafe_action',
+            'Kondisi tidak aman'  => 'unsafe_condition',
+        ];
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        $rows = $this->ytdQuery($fungsi, $tahun, $bulan)
+            ->selectRaw("
+                MONTH(STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i')) AS bulan_ke,
+                JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.kategori'))  AS kategori,
+                COUNT(*) AS cnt
+            ")
+            ->groupBy('bulan_ke', 'kategori')
+            ->orderBy('bulan_ke')
+            ->get();
+
+        foreach ($rows as $row) {
+            $bln = (int) $row->bulan_ke;
+            if ($bln < 1 || $bln > $bulan) {
+                continue;
+            }
+
+            $key = $kategoriMap[$row->kategori] ?? null;
+            $cnt = (int) $row->cnt;
+
+            $monthlyData[$bln]['total'] += $cnt;
+            if ($key !== null) {
+                $monthlyData[$bln][$key] += $cnt;
+            }
+        }
+
+        $ytdTotal = 0;
+        for ($i = 1; $i <= $bulan; $i++) {
+            $ytdTotal += $monthlyData[$i]['total'];
+        }
+
+        $closedTotal = $this->ytdQuery($fungsi, $tahun, $bulan)
+            ->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'closed'")
+            ->count();
+
+        $closingRate = ($ytdTotal > 0)
+            ? round(($closedTotal / $ytdTotal) * 100, 2)
+            : 0;
+
+        return [
+            'months'       => array_values($monthlyData),
+            'annual_total' => $ytdTotal,
+            'closed_total' => $closedTotal,
+            'closing_rate' => $closingRate,
+            'year'         => $tahun,
+            'bulan'        => $bulan,
+        ];
+    }
+
+    /**
+     * Chart 3 — Kategori PEKA YTD khusus Executive Summary PDF.
+     */
+    private function chartKategoriPekaYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $kategoriMap = [
+            'Tindakan aman'      => 'Safe Action',
+            'Kondisi aman'       => 'Safe Condition',
+            'Tindakan tidak aman'=> 'Unsafe Action',
+            'Kondisi tidak aman' => 'Unsafe Condition',
+        ];
+
+        $rawData = $this->ytdQuery($fungsi, $tahun, $bulan)
+            ->selectRaw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.kategori')) as label, COUNT(*) as total")
+            ->groupBy('label')
+            ->orderBy('label')
+            ->pluck('total', 'label')
+            ->toArray();
+
+        $result = [];
+        foreach ($kategoriMap as $dbKey => $displayLabel) {
+            $result[$displayLabel] = $rawData[$dbKey] ?? 0;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 4 — Rekap Persentase Temuan per Fungsi YTD khusus Executive Summary PDF.
+     */
+    private function chartPersentaseFungsiYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        $result      = [];
+
+        foreach ($fungsiScope as $f) {
+            $row = $this->ytdQuery($f, $tahun, $bulan)
+                ->selectRaw("
+                    COUNT(*) as total,
+                    SUM(CASE WHEN LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'closed' THEN 1 ELSE 0 END) as total_closed
+                ")
+                ->first();
+
+            $total  = $row->total ?? 0;
+            $closed = $row->total_closed ?? 0;
+
+            if ($total === 0) {
+                $result[$f] = ['closed' => 0, 'open' => 0];
+            } else {
+                $closedPct  = round(($closed / $total) * 100, 1);
+                $result[$f] = [
+                    'closed' => $closedPct,
+                    'open'   => round(100 - $closedPct, 1),
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 5 — Rekap Persentase Penindak Lanjut / SAP YTD khusus Executive Summary PDF.
+     */
+    private function chartTindakLanjutYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+
+        $totalSap = $this->ytdQuery(null, $tahun, $bulan)
+            ->whereNotNull('no_notifikasi_sap')
+            ->where('no_notifikasi_sap', '!=', '')
+            ->count();
+
+        if ($totalSap === 0) {
+            $result = [];
+            foreach ($fungsiScope as $f) {
+                $result[$f] = 0;
+            }
+            return $result;
+        }
+
+        $result = [];
+        foreach ($fungsiScope as $f) {
+            $count = $this->ytdQuery($f, $tahun, $bulan)
+                ->whereNotNull('no_notifikasi_sap')
+                ->where('no_notifikasi_sap', '!=', '')
+                ->count();
+
+            $result[$f] = round(($count / $totalSap) * 100);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 7 — Unsafe Action Category YTD khusus Executive Summary PDF.
+     * 6 kategori urutan tetap.
+     */
+    private function chartUnsafeActionYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $categories = [
+            'Tidak mengikuti Prosedur / Failure to follow procedure'
+                => 'Failure to Follow Procedure',
+            'Tidak menggunakan APD yang standard / Using improper PPE'
+                => 'Using Improper PPE',
+            'Posisi kerja yang tidak tepat / Improper position for task'
+                => 'Improper Position for Task',
+            'Penempatan tidak sesuai / Improper Placement'
+                => 'Improper Placement',
+            'Mengoperasikan diluar standar/operating out of standard'
+                => 'Operating Out of Standard',
+            'Menggunakan peralatan yang tidak standard/rusak / Using defective tools/equipments'
+                => 'Using Defective Tools/Equipments',
+        ];
+
+        return $this->buildCategoryChartYtd('unsafe_action', $categories, $fungsi, $tahun, $bulan);
+    }
+
+    /**
+     * Chart 8 — Unsafe Condition Category YTD khusus Executive Summary PDF.
+     * 12 kategori urutan tetap.
+     */
+    private function chartUnsafeConditionYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $categories = [
+            'Rambu-rambu yang tidak cukup/ Inadequate warning system'
+                => 'Inadequate Warning System',
+            'Peralatan yang tidak sesuai/ Incorrect tools/equipments'
+                => 'Incorrect Tools/Equipments',
+            'Peralatan yang rusak / Defective tools/equipments'
+                => 'Defective Tools/Equipments',
+            'Pengukuran yang tidak tepat/Improper measurement'
+                => 'Improper Measurement',
+            'Pengaman yang tidak cukup/Inadequate Guards/Barriers'
+                => 'Inadequate Guards/Barriers',
+            'Mode operasi yang tidak layak / Inadequate operation mode'
+                => 'Inadequate Operation Mode',
+            'Material yang tidak tepat / Incorrect material'
+                => 'Incorrect Material',
+            'Kondisi lantai/permukaan tidak layak / Inadequate condition of floor/surface'
+                => 'Inadequate Condition of Floor/Surface',
+            'Keterbatasan ruangan untuk kerja / Restricted space of action'
+                => 'Restricted Space of Action',
+            'Integritas peralatan yang tidak layak/ Inadequate integrity of equipment'
+                => 'Inadequate Integrity of Equipment',
+            'Housekeeping yang tidak baik / Poor house keeping order'
+                => 'Poor Housekeeping',
+            'APD yang tidak cukup / Inadequate PPE'
+                => 'Inadequate PPE',
+        ];
+
+        return $this->buildCategoryChartYtd('unsafe_conditon', $categories, $fungsi, $tahun, $bulan);
+    }
+
+    /**
+     * Helper — bangun data chart kategori YTD (Chart 7 & 8) khusus Executive Summary PDF.
+     */
+    private function buildCategoryChartYtd(
+        string $jsonKey,
+        array $categories,
+        ?string $fungsi,
+        int $tahun,
+        int $bulan
+    ): array {
+        $data  = [];
+        $total = 0;
+
+        foreach ($categories as $key => $val) {
+            $label = is_string($key) ? $key : $val;
+            $search = $val;
+
+            $count = $this->ytdQuery($fungsi, $tahun, $bulan)
+                ->whereRaw(
+                    "LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.{$jsonKey}'))) LIKE ?",
+                    ['%' . strtolower($search) . '%']
+                )
+                ->count();
+
+            $data[$label] = $count;
+            $total     += $count;
+        }
+
+        return ['data' => $data, 'total' => $total];
+    }
+
     // -----------------------------------------------------------------
     // CHART METHODS
     // -----------------------------------------------------------------
@@ -620,7 +917,7 @@ class DashboardChartService
                 ->whereNotNull('no_notifikasi_sap')
                 ->where('no_notifikasi_sap', '!=', '')
                 ->count();
-                
+
             $result[$f] = round(($count / $totalSap) * 100);
         }
 

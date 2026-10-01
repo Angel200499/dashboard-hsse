@@ -76,6 +76,13 @@
                     <a href="{{ request()->url() }}" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter</a>
                 @endif
             </form>
+
+            {{-- Executive Summary PDF Button — selalu Global, tersedia untuk semua role --}}
+            @include('components.executive-summary-btn', [
+                'selectedYear'   => $selectedYear,
+                'selectedMonth'  => $selectedMonth,
+                'maxBulanSipeka' => $maxBulanSipeka,
+            ])
         </div>
     </div>
 
@@ -714,6 +721,10 @@
                             data: invData,
                             backgroundColor: '#ED7D31',
                             datalabels: {
+                                display: (ctx) => {
+                                    const key = invLabels[ctx.dataIndex];
+                                    return invRaw[key] !== null && invData[ctx.dataIndex] > 0;
+                                },
                                 color: '#fff',
                                 anchor: 'center',
                                 align: 'center',
