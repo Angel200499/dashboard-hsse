@@ -11,6 +11,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardFunctionController;
 use App\Http\Controllers\MasterManpowerController;
 use App\Http\Controllers\MasterFunctionMappingController;
+use App\Http\Controllers\MasterPersonilController;
+use App\Http\Controllers\UnreportedPersonilController;
 
 // -----------------------------------------------------------------
 // Guest Routes — Public & Auth
@@ -74,6 +76,15 @@ Route::middleware('auth')->group(function () {
          ->name('findings.update');
 
     // -----------------------------------------------------------------
+    // Daftar Belum Melapor (Modal & Export) — Semua role dashboard
+    // Otorisasi fungsi divalidasi di UnreportedPersonilController
+    // -----------------------------------------------------------------
+    Route::get('/unreported-personil/data', [UnreportedPersonilController::class, 'data'])
+         ->name('unreported-personil.data');
+    Route::get('/unreported-personil/export', [UnreportedPersonilController::class, 'export'])
+         ->name('unreported-personil.export');
+
+    // -----------------------------------------------------------------
     // Admin HSSE Only — Import & User Management
     // -----------------------------------------------------------------
     Route::middleware('role:Admin HSSE')->group(function () {
@@ -105,5 +116,19 @@ Route::middleware('auth')->group(function () {
              ->name('master.function-mapping.update');
         Route::delete('/master/function-mapping/{mapping}', [MasterFunctionMappingController::class, 'destroy'])
              ->name('master.function-mapping.destroy');
+
+        // -----------------------------------------------------------------
+        // Master Personil (Pekerja & TAD) — hanya Admin HSSE
+        // -----------------------------------------------------------------
+        Route::get('/master/personil', [MasterPersonilController::class, 'index'])
+             ->name('master.personil.index');
+        Route::post('/master/personil', [MasterPersonilController::class, 'store'])
+             ->name('master.personil.store');
+        Route::put('/master/personil/{personil}', [MasterPersonilController::class, 'update'])
+             ->name('master.personil.update');
+        Route::patch('/master/personil/{personil}/toggle-status', [MasterPersonilController::class, 'toggleStatus'])
+             ->name('master.personil.toggle-status');
+        Route::delete('/master/personil/{personil}', [MasterPersonilController::class, 'destroy'])
+             ->name('master.personil.destroy');
     });
 });

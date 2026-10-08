@@ -193,7 +193,13 @@
 
         <!-- Chart 4: Keterlibatan Observasi (Stacked Vertical Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-1">4. Keterlibatan dalam Observasi</h3>
+            <h3 class="text-base font-bold text-slate-800 mb-1 flex flex-wrap items-center gap-2">
+                <span>4. Keterlibatan dalam Observasi</span>
+                <span class="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100" title="Klik bar segmen Belum Melapor untuk melihat daftar personil">
+                    <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
+                    Klik bar untuk daftar personil
+                </span>
+            </h3>
             <p class="text-xs text-slate-400 mb-3">
                 Rumus: Pelapor unik bulan terpilih &divide; Manpower bulan terpilih &times; 100%
             </p>
@@ -412,6 +418,9 @@
         </div>
     </div>
 </div>
+
+{{-- Modal Daftar Belum Melapor --}}
+@include('components.unreported-modal')
 
 <!-- Update Modal -->
 <div id="updateModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center">
@@ -732,8 +741,8 @@
                                 formatter: (value, ctx) => {
                                     const key = invLabels[ctx.dataIndex];
                                     if (invRaw[key] === null) return null;
-                                    if (value === 0) return null;
-                                    return invRaw[key].toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+                                    const val = Math.round(invRaw[key]);
+                                    return val > 0 ? val + '%' : null;
                                 }
                             }
                         },
@@ -747,13 +756,31 @@
                 },
                 options: {
                     ...commonOptions,
+                    onHover: (event, chartElement) => {
+                        const canvas = event.native?.target || document.getElementById('chart4');
+                        if (canvas) {
+                            canvas.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        if (!elements || elements.length === 0) return;
+                        const el = elements[0];
+                        const key = invLabels[el.index];
+                        if (!key) return;
+
+                        // Status "belum pernah melapor" dihitung dari seluruh riwayat SIPEKA,
+                        // sehingga modal tidak memerlukan filter bulan/tahun.
+                        if (typeof window.openUnreportedModal === 'function') {
+                            window.openUnreportedModal(key);
+                        }
+
+                    },
                     scales: {
                         x: { stacked: true, grid: { display: false } },
                         y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } }
                     },
                     plugins: {
                         legend: { position: 'bottom' },
-                        datalabels: { display: false },
                         tooltip: {
                             callbacks: {
                                 label: function(ctx) {
@@ -776,11 +803,37 @@
         
         new Chart(document.getElementById('chart5'), {
             type: 'bar',
+            plugins: [ChartDataLabels],
             data: {
                 labels: ptLabels,
                 datasets: [
-                    { label: 'Closed', data: closedData, backgroundColor: '#548235' },
-                    { label: 'TOTAL (Open)', data: openData, backgroundColor: '#FFC000' }
+                    {
+                        label: 'Closed',
+                        data: closedData,
+                        backgroundColor: '#548235',
+                        datalabels: {
+                            display: (ctx) => {
+                                const val = closedData[ctx.dataIndex];
+                                return val !== null && val !== undefined && Math.round(val) > 0;
+                            },
+                            color: '#fff',
+                            anchor: 'center',
+                            align: 'center',
+                            font: { weight: 'bold', size: 12 },
+                            formatter: (value) => {
+                                const val = Math.round(value);
+                                return val > 0 ? val + '%' : null;
+                            }
+                        }
+                    },
+                    {
+                        label: 'TOTAL (Open)',
+                        data: openData,
+                        backgroundColor: '#FFC000',
+                        datalabels: {
+                            display: false
+                        }
+                    }
                 ]
             },
             options: { 
@@ -789,7 +842,17 @@
                     x: { stacked: true, grid: { display: false } }, 
                     y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } } 
                 },
-                plugins: { legend: { position: 'bottom' } }
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const val = ctx.raw;
+                                return ` ${ctx.dataset.label}: ${val}%`;
+                            }
+                        }
+                    }
+                }
             }
         });
 
@@ -824,7 +887,8 @@
                         data: dataArr.map(d => ((d.value / total) * 100).toFixed(1)), 
                         backgroundColor: color,
                         borderWidth: 0,
-                        borderRadius: 4
+                        borderRadius: 4,
+                        barThickness: 18  // fixed agar jarak antar label seragam
                     }] 
                 },
                 options: { 
@@ -856,6 +920,7 @@
                         }, 
                         y: { 
                             grid: { display: false },
+                            afterFit: (scale) => { scale.width = 300; }, // semua bar mulai dari titik yang sama
                             ticks: {
                                 autoSkip: false,
                                 font: { size: 9.5 }  // label bilingual lebih panjang

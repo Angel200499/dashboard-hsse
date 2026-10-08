@@ -35,8 +35,8 @@
         .header-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 5px;
-            padding-bottom: 2px;
+            margin-bottom: 15px;
+            padding-bottom: 0px;
         }
         .header-table td {
             vertical-align: middle;
@@ -44,36 +44,34 @@
         .header-logo-left {
             width: 25%;
             text-align: left;
+            vertical-align: middle;
+            padding-left: 14px;
         }
         .header-title-center {
             width: 50%;
             text-align: center;
+            vertical-align: middle;
         }
         .header-logo-right {
             width: 25%;
             text-align: right;
+            vertical-align: top;
+            padding: 0;
         }
         .main-title {
-            font-size: 20px;
-            font-weight: 800;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 19px;
+            font-weight: bold;
             color: #000000;
-            letter-spacing: -0.3px;
             display: inline;
         }
         .sub-title {
-            font-size: 14px;
-            font-weight: 400;
-            color: #1f2937;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 13.5px;
+            font-weight: normal;
+            color: #000000;
             margin-left: 6px;
             display: inline;
-        }
-
-        .header-pertamina-frame {
-            display: inline-block;
-            border-left: 1px solid #cbd5e1;
-            border-bottom: 1px solid #cbd5e1;
-            border-bottom-left-radius: 20px;
-            padding: 2px 14px 4px 16px;
         }
 
         /* FOOTER */
@@ -139,17 +137,19 @@
         }
         .sec-num-badge {
             display: inline-block;
-            width: 14px;
-            height: 14px;
-            line-height: 14px;
+            width: 15px;
+            height: 15px;
+            line-height: 15px;
             background-color: #000000;
             color: #ffffff;
-            font-size: 8.5px;
+            font-size: 9.5px;
             font-weight: bold;
+            font-family: 'Times New Roman', Times, serif;
             border-radius: 50%;
+            border: 1.5px solid #2e528f;
             text-align: center;
             vertical-align: middle;
-            margin-right: 4px;
+            margin-right: 5px;
         }
         .sec-title {
             font-size: 9.5px;
@@ -303,26 +303,26 @@
                         $danantaraPath = public_path('assets/images/logo/danantara.png');
                     @endphp
                     @if(file_exists($danantaraPath))
-                        <img src="{{ $danantaraPath }}" style="height:25px;vertical-align:middle;" alt="Danantara Indonesia">
+                        <img src="{{ $danantaraPath }}" style="height:24px;vertical-align:middle;" alt="Danantara Indonesia">
                     @else
-                        <span style="font-size:12px;font-weight:900;color:#000000;">Danantara Indonesia</span>
+                        <span style="font-size:12px;font-weight:bold;color:#000000;">Danantara Indonesia</span>
                     @endif
                 </td>
                 <td class="header-title-center">
-                    <span class="main-title">PEKA Report</span>
-                    <span class="sub-title">{{ $periodeLabel }}</span>
+                    <span class="main-title">PEKA Report</span> <span class="sub-title">{{ $periodeLabel }}</span>
                 </td>
                 <td class="header-logo-right">
                     @php
+                        $pertaminaFramedPath = public_path('assets/images/logo/pertamina-framed.png');
                         $pertaminaPath = public_path('assets/images/logo/pertamina.png');
                     @endphp
-                    <div class="header-pertamina-frame">
-                        @if(file_exists($pertaminaPath))
-                            <img src="{{ $pertaminaPath }}" style="height:20px;vertical-align:middle;" alt="PERTAMINA">
-                        @else
-                            <span style="font-size:11px;font-weight:900;color:#004d25;">PERTAMINA</span>
-                        @endif
-                    </div>
+                    @if(file_exists($pertaminaFramedPath))
+                        <img src="{{ $pertaminaFramedPath }}" style="height:40px;vertical-align:top;" alt="PERTAMINA">
+                    @elseif(file_exists($pertaminaPath))
+                        <img src="{{ $pertaminaPath }}" style="height:20px;vertical-align:middle;" alt="PERTAMINA">
+                    @else
+                        <span style="font-size:11px;font-weight:bold;color:#004d25;">PERTAMINA</span>
+                    @endif
                 </td>
             </tr>
         </table>
@@ -529,23 +529,22 @@
             <tr>
                 <td class="header-logo-left">
                     @if(file_exists($danantaraPath))
-                        <img src="{{ $danantaraPath }}" style="height:25px;vertical-align:middle;" alt="Danantara Indonesia">
+                        <img src="{{ $danantaraPath }}" style="height:24px;vertical-align:middle;" alt="Danantara Indonesia">
                     @else
-                        <span style="font-size:12px;font-weight:900;color:#000000;">Danantara Indonesia</span>
+                        <span style="font-size:12px;font-weight:bold;color:#000000;">Danantara Indonesia</span>
                     @endif
                 </td>
                 <td class="header-title-center">
-                    <span class="main-title">PEKA Report</span>
-                    <span class="sub-title">{{ $periodeLabel }}</span>
+                    <span class="main-title">PEKA Report</span> <span class="sub-title">{{ $periodeLabel }}</span>
                 </td>
                 <td class="header-logo-right">
-                    <div class="header-pertamina-frame">
-                        @if(file_exists($pertaminaPath))
-                            <img src="{{ $pertaminaPath }}" style="height:20px;vertical-align:middle;" alt="PERTAMINA">
-                        @else
-                            <span style="font-size:11px;font-weight:900;color:#004d25;">PERTAMINA</span>
-                        @endif
-                    </div>
+                    @if(file_exists($pertaminaFramedPath))
+                        <img src="{{ $pertaminaFramedPath }}" style="height:40px;vertical-align:top;" alt="PERTAMINA">
+                    @elseif(file_exists($pertaminaPath))
+                        <img src="{{ $pertaminaPath }}" style="height:20px;vertical-align:middle;" alt="PERTAMINA">
+                    @else
+                        <span style="font-size:11px;font-weight:bold;color:#004d25;">PERTAMINA</span>
+                    @endif
                 </td>
             </tr>
         </table>

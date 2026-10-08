@@ -110,6 +110,13 @@
                             <div class="w-1.5 h-1.5 rounded-full mr-3 {{ request()->is('master/function-mapping*') ? 'bg-[#9DBF2A]' : 'bg-slate-300' }}"></div>
                             <span class="text-sm">Mapping Fungsi</span>
                         </a>
+                        <a
+                            class="flex items-center px-3 py-2 transition-colors rounded-r-lg {{ request()->is('master/personil*') ? 'bg-[#9DBF2A]/10 text-[#9DBF2A] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700' }}"
+                            href="{{ route('master.personil.index') }}"
+                        >
+                            <div class="w-1.5 h-1.5 rounded-full mr-3 {{ request()->is('master/personil*') ? 'bg-[#9DBF2A]' : 'bg-slate-300' }}"></div>
+                            <span class="text-sm">Personil (Pekerja & TAD)</span>
+                        </a>
                     </div>
                 </div>
             @endif
