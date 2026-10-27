@@ -26,7 +26,7 @@
     
     <!-- Background Image with Overlay -->
     <div class="relative flex items-center justify-center min-h-screen bg-slate-900 bg-bottom bg-cover" 
-         style="background-image: url('{{ asset('bglogin.png') }}');">
+         style="background-image: url('{{ asset('bglogin.webp') }}');">
         
         <!-- Dark Overlay -->
         <div class="absolute inset-0 bg-black/40"></div>

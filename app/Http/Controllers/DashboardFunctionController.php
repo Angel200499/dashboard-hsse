@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\SipekaFinding;
 use App\Models\MasterFunctionMapping;
+use App\Models\MasterManpower;
 use App\Services\DashboardChartService;
 use App\Services\FindingQueryService;
 use Illuminate\Support\Facades\DB;
@@ -81,6 +82,124 @@ class DashboardFunctionController extends Controller
         $selectedMonth = $bulan;
 
         // -----------------------------------------------------------------
+        // FILTER MANDIRI & DEFAULT OTOMATIS: KETERLIBATAN OBSERVASI (CARD 4)
+        // -----------------------------------------------------------------
+        // 1. Tahun Keterlibatan (ko_year):
+        //    Jika user mengirim ko_year, gunakan.
+        //    Jika tidak ada ko_year, default ke tahun berjalan (now()->year).
+        $koYearRaw = $request->get('ko_year');
+        if ($koYearRaw !== null && preg_match('/^\d{4}$/', $koYearRaw)) {
+            $koYear = (int) $koYearRaw;
+        } else {
+            // Default dinamis: tahun berjalan
+            $koYear = (int) now()->year;
+        }
+
+        // 2. Bulan terakhir yang memiliki data SIPEKA untuk fungsi ini pada tahun $koYear
+        $koMaxBulan = SipekaFinding::maxBulanTahunFungsi($koYear, $fungsi);
+
+        // 3. Bulan Keterlibatan (ko_month):
+        //    - Jika user mengirim parameter ko_month:
+        //      * Angka 1-12: hormati pilihan pengguna
+        //      * Kosong (""): user sengaja memilih "Semua Bulan"
+        //    - Jika TIDAK ADA parameter ko_month di request (halaman baru dibuka):
+        //      * Default otomatis ke bulan data SIPEKA terakhir ($koMaxBulan)
+        if ($request->has('ko_month')) {
+            $koMonthRaw = $request->get('ko_month');
+            if ($koMonthRaw !== null && $koMonthRaw !== '' && is_numeric($koMonthRaw) && (int) $koMonthRaw >= 1 && (int) $koMonthRaw <= 12) {
+                $koMonth = (int) $koMonthRaw;
+            } else {
+                $koMonth = null; // User eksplisit memilih "Semua Bulan"
+            }
+        } else {
+            // Default otomatis dari data aktual
+            $koMonth = $koMaxBulan;
+        }
+
+        // 4. Evaluasi status ketersediaan data untuk Card 4:
+        //    - 'no_sipeka'  : data temuan SIPEKA pada tahun/bulan ini belum tersedia
+        //    - 'no_month'   : user sengaja memilih "Semua Bulan"
+        //    - 'no_manpower': data SIPEKA ada, tapi manpower belum diinput / 0
+        //    - 'ok'         : data SIPEKA dan manpower tersedia
+        $koStatus = 'ok';
+        if ($koMaxBulan === null) {
+            // Tahun yang dipilih sama sekali tidak memiliki data SIPEKA untuk fungsi ini
+            $koStatus = 'no_sipeka';
+        } elseif ($request->has('ko_month') && ($request->get('ko_month') === '' || $request->get('ko_month') === null)) {
+            // User secara eksplisit memilih "Semua Bulan"
+            $koStatus = 'no_month';
+        } elseif ($koMonth === null) {
+            $koStatus = 'no_month';
+        } elseif ($koMonth > $koMaxBulan) {
+            // Bulan yang dipilih melebihi data SIPEKA aktual
+            $koStatus = 'no_sipeka';
+        } else {
+            $mp = MasterManpower::getManpower($koYear, $koMonth, $fungsi);
+            if ($mp === null || $mp === 0) {
+                $koStatus = 'no_manpower';
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // FILTER MANDIRI & DEFAULT OTOMATIS: REPORTING RATE PER FUNGSI (CARD 2)
+        // -----------------------------------------------------------------
+        // 1. Tahun Reporting Rate (rr_year):
+        //    Jika user mengirim rr_year, gunakan.
+        //    Jika tidak ada rr_year, default ke tahun berjalan (now()->year).
+        $rrYearRaw = $request->get('rr_year');
+        if ($rrYearRaw !== null && preg_match('/^\d{4}$/', $rrYearRaw)) {
+            $rrYear = (int) $rrYearRaw;
+        } else {
+            // Default dinamis: tahun berjalan
+            $rrYear = (int) now()->year;
+        }
+
+        // 2. Bulan terakhir yang memiliki data SIPEKA untuk fungsi ini pada tahun $rrYear
+        $rrMaxBulan = SipekaFinding::maxBulanTahunFungsi($rrYear, $fungsi);
+
+        // 3. Bulan Reporting Rate (rr_month):
+        //    - Jika user mengirim parameter rr_month:
+        //      * Angka 1-12: hormati pilihan pengguna
+        //      * Kosong (""): user sengaja memilih "Semua Bulan" (mode distribusi)
+        //    - Jika TIDAK ADA parameter rr_month di request (halaman baru dibuka):
+        //      * Default otomatis ke bulan data SIPEKA terakhir ($rrMaxBulan)
+        if ($request->has('rr_month')) {
+            $rrMonthRaw = $request->get('rr_month');
+            if ($rrMonthRaw !== null && $rrMonthRaw !== '' && is_numeric($rrMonthRaw) && (int) $rrMonthRaw >= 1 && (int) $rrMonthRaw <= 12) {
+                $rrMonth = (int) $rrMonthRaw;
+            } else {
+                $rrMonth = null; // User eksplisit memilih "Semua Bulan"
+            }
+        } else {
+            // Default otomatis dari data aktual
+            $rrMonth = $rrMaxBulan;
+        }
+
+        // 4. Evaluasi status ketersediaan data untuk Card 2:
+        //    - 'no_sipeka'  : data temuan SIPEKA pada tahun/bulan ini belum tersedia
+        //    - 'no_manpower': data SIPEKA ada, tapi manpower belum diinput / 0
+        //    - 'all_months' : user sengaja memilih "Semua Bulan" (mode distribusi)
+        //    - 'ok'         : data SIPEKA dan manpower tersedia
+        $rrStatus = 'ok';
+        if ($rrMaxBulan === null) {
+            // Tahun yang dipilih sama sekali tidak memiliki data SIPEKA untuk fungsi ini
+            $rrStatus = 'no_sipeka';
+        } elseif ($request->has('rr_month') && ($request->get('rr_month') === '' || $request->get('rr_month') === null)) {
+            // User secara eksplisit memilih "Semua Bulan"
+            $rrStatus = 'all_months';
+        } elseif ($rrMonth === null) {
+            $rrStatus = 'no_sipeka';
+        } elseif ($rrMonth > $rrMaxBulan) {
+            // Bulan yang dipilih melebihi data SIPEKA aktual
+            $rrStatus = 'no_sipeka';
+        } else {
+            $mp = MasterManpower::getManpower($rrYear, $rrMonth, $fungsi);
+            if ($mp === null || $mp === 0) {
+                $rrStatus = 'no_manpower';
+            }
+        }
+
+        // -----------------------------------------------------------------
         // Mapping-aware filter helper
         // Jika mapping tersedia → whereIn; jika belum → fallback LIKE
         // -----------------------------------------------------------------
@@ -134,10 +253,18 @@ class DashboardFunctionController extends Controller
 
         // -----------------------------------------------------------------
         // Charts — DashboardChartService yang sama dengan Global Dashboard
-        // Difilter by $fungsi + $tahun + $bulan → Reporting Rate menggunakan manpower bulanan
-        // Chart lain tidak terpengaruh oleh $bulan
+        // Reporting Rate dikontrol mandiri via $rrYear dan $rrMonth
+        // Keterlibatan Observasi (Card 4) dikontrol mandiri via $koYear dan $koMonth
+        // Chart lain tidak terpengaruh oleh $rrMonth / $koMonth / $bulan
         // -----------------------------------------------------------------
-        $charts = $this->chartService->getCharts($fungsi, $tahun, $bulan);
+        $charts = $this->chartService->getCharts($fungsi, $tahun, $bulan, null, $koYear, $koMonth, $rrYear, $rrMonth, true);
+
+        // Proteksi Reporting Rate Card 2:
+        // Jika periode SIPEKA atau manpower tidak tersedia (rrStatus === 'no_sipeka' atau 'no_manpower'),
+        // pastikan dataset fungsi ini bernilai null agar tidak menampilkan angka kalkulasi parsial/menyesatkan.
+        if ($rrStatus === 'no_sipeka' || $rrStatus === 'no_manpower') {
+            $charts['reporting']['data'][$fungsi] = null;
+        }
 
         // -----------------------------------------------------------------
         // Tabel — FindingQueryService
@@ -154,28 +281,37 @@ class DashboardFunctionController extends Controller
             'fungsi',
             'selectedYear',
             'selectedMonth',
-            'maxBulanSipeka'   // batas atas bulan Reporting Rate berdasarkan data SIPEKA aktual
+            'maxBulanSipeka',   // batas atas bulan Reporting Rate berdasarkan data SIPEKA aktual
+            'koYear',
+            'koMonth',
+            'koStatus',
+            'koMaxBulan',
+            'rrYear',
+            'rrMonth',
+            'rrStatus',
+            'rrMaxBulan'
         ));
     }
 
     // -----------------------------------------------------------------
-    // EXPORT PDF — Rekap Pelapor Business Support
+    // EXPORT PDF — Rekap Pelapor per Fungsi
     // -----------------------------------------------------------------
 
     /**
-     * Generate dan download PDF Rekap Pelapor Business Support.
+     * Generate dan download PDF Rekap Pelapor per fungsi.
      *
-     * Endpoint ini dikunci ke fungsi Business Support saja.
-     * Data diambil dari service yang sama dengan dashboard agar konsisten.
-     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string|null               $nama_fungsi
+     * @return \Illuminate\Http\Response
      * @throws \Symfony\Component\HttpKernel\Exception\HttpException
      */
-    public function exportBusinessSupportReporterPdf(Request $request)
+    public function exportReporterPdf(Request $request, ?string $nama_fungsi = null)
     {
-        // Otorisasi: hanya user fungsi Business Support (Admin & Manager)
         $user = auth()->user();
-        if (strtolower($user->fungsi) !== 'business support') {
-            abort(403, 'Anda tidak memiliki akses ke rekap Business Support.');
+        $fungsi = $this->resolveFungsi($nama_fungsi, $user);
+
+        if (!$this->canAccessRekapPelapor($user, $fungsi)) {
+            abort(403, 'Anda tidak memiliki hak akses untuk mengunduh PDF Rekap Pelapor fungsi ' . $fungsi . '.');
         }
 
         $rekapPeriode = (string) $request->get('rekap_periode', '');
@@ -184,14 +320,20 @@ class DashboardFunctionController extends Controller
         $rekapSearch  = (string) $request->get('rekap_search', '');
         $rekapSearch  = trim($rekapSearch);
 
-        $rekapPelapor = $this->chartService->getBusinessSupportReporterRecap(
+        $rekapPelapor = $this->chartService->getFunctionReporterRecap(
+            $fungsi,
             $rekapPeriode,
             $rekapBulan,
             $rekapTahun,
             $rekapSearch
         );
 
-        $pdf = Pdf::loadView('pdf.business-support-rekap-pelapor', [
+        $pdfView = view()->exists('pdf.rekap-pelapor')
+            ? 'pdf.rekap-pelapor'
+            : 'pdf.business-support-rekap-pelapor';
+
+        $pdf = Pdf::loadView($pdfView, [
+            'fungsi'        => $fungsi,
             'rekapPelapor'  => $rekapPelapor,
             'rekapPeriode'  => $rekapPeriode,
             'rekapBulan'    => $rekapBulan,
@@ -200,34 +342,41 @@ class DashboardFunctionController extends Controller
             'generatedAt'   => now()->format('d/m/Y H:i'),
         ])->setPaper('a4', 'landscape');
 
-
-        // Nama file dinamis berdasarkan periode
-        $filename = $this->buildPdfFilename($rekapPeriode, $rekapBulan, $rekapTahun);
+        // Nama file dinamis berdasarkan fungsi dan periode
+        $filename = $this->buildPdfFilename($fungsi, $rekapPeriode, $rekapBulan, $rekapTahun);
 
         return $pdf->download($filename);
     }
 
+    /**
+     * Generate dan download PDF Rekap Pelapor Business Support (backward compatibility).
+     *
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    public function exportBusinessSupportReporterPdf(Request $request)
+    {
+        return $this->exportReporterPdf($request, 'Business Support');
+    }
+
     // -----------------------------------------------------------------
-    // HALAMAN REKAP PELAPOR — Business Support (halaman tersendiri)
+    // HALAMAN REKAP PELAPOR — Per Fungsi (halaman tersendiri)
     // -----------------------------------------------------------------
 
     /**
-     * Halaman Rekap Pelapor Business Support.
+     * Halaman Rekap Pelapor per fungsi.
      *
      * Accessible oleh:
-     *   - Admin HSSE / Manager HSSE (global access)
-     *   - Admin Function Business Support
-     *   - Manager Function Business Support
-     *
-     * Tidak accessible oleh fungsi lain.
+     *   - Superadmin (global access ke semua fungsi)
+     *   - Admin Function & Manager Function sesuai fungsinya
+     *   - Admin HSSE & Manager HSSE untuk fungsi HSSE
      */
-    public function rekapPelapor(Request $request)
+    public function rekapPelapor(Request $request, ?string $nama_fungsi = null)
     {
         $user = auth()->user();
+        $fungsi = $this->resolveFungsi($nama_fungsi, $user);
 
-        // Otorisasi: hanya user fungsi Business Support (Admin & Manager)
-        if (strtolower($user->fungsi) !== 'business support') {
-            abort(403, 'Anda tidak memiliki akses ke halaman ini.');
+        if (!$this->canAccessRekapPelapor($user, $fungsi)) {
+            abort(403, 'Anda tidak memiliki hak akses ke Rekap Pelapor fungsi ' . $fungsi . '.');
         }
 
         $rekapPeriode = (string) $request->get('rekap_periode', '');
@@ -236,14 +385,20 @@ class DashboardFunctionController extends Controller
         $rekapSearch  = (string) $request->get('rekap_search', '');
         $rekapSearch  = trim($rekapSearch);
 
-        $rekapPelapor = $this->chartService->getBusinessSupportReporterRecap(
+        $rekapPelapor = $this->chartService->getFunctionReporterRecap(
+            $fungsi,
             $rekapPeriode,
             $rekapBulan,
             $rekapTahun,
             $rekapSearch
         );
 
-        return view('pages.business-support.rekap-pelapor', compact(
+        $viewName = view()->exists('pages.rekap-pelapor')
+            ? 'pages.rekap-pelapor'
+            : 'pages.business-support.rekap-pelapor';
+
+        return view($viewName, compact(
+            'fungsi',
             'rekapPelapor',
             'rekapPeriode',
             'rekapBulan',
@@ -253,17 +408,68 @@ class DashboardFunctionController extends Controller
     }
 
     /**
-     * Bangun nama file PDF yang informatif berdasarkan periode.
+     * Otorisasi hak akses Rekap Pelapor:
+     * - Superadmin memiliki akses global ke seluruh fungsi
+     * - Admin HSSE & Manager HSSE hanya dapat melihat Rekap Pelapor HSSE (kecuali Superadmin)
+     * - Admin Function & Manager Function hanya dapat melihat Rekap Pelapor fungsinya sendiri
+     * - Role lain: tidak ada akses
      */
-    private function buildPdfFilename(string $periode, int $bulan, int $tahun): string
+    private function canAccessRekapPelapor($user, string $targetFungsi): bool
     {
+        // 1. Superadmin (role Superadmin atau user 'admin') memiliki akses global
+        if ($user->role === 'Superadmin' || $user->username === 'admin') {
+            return true;
+        }
+
+        // 2. Admin HSSE & Manager HSSE hanya dapat melihat Rekap Pelapor HSSE
+        if ($user->role === 'Admin HSSE' || $user->role === 'Manager HSSE') {
+            return strtolower($targetFungsi) === 'hsse';
+        }
+
+        // 3. Admin Function & Manager Function hanya dapat melihat Rekap Pelapor fungsinya sendiri
+        if ($user->role === 'Admin Function' || $user->role === 'Manager Function') {
+            return strtolower($user->fungsi) === strtolower($targetFungsi);
+        }
+
+        return false;
+    }
+
+    /**
+     * Resolusi dan normalisasi nama fungsi dari parameter URL atau user.
+     */
+    private function resolveFungsi(?string $nama_fungsi, $user): string
+    {
+        $raw = $nama_fungsi ?? $user->fungsi;
+        if (empty($raw)) {
+            abort(404, 'Fungsi tidak ditemukan.');
+        }
+
+        $validFunctions = ['Operation', 'Maintenance', 'HSSE', 'Business Support'];
+        $cleaned = strtolower(str_replace(['-', '_'], ' ', trim($raw)));
+
+        foreach ($validFunctions as $vf) {
+            if (strtolower($vf) === $cleaned) {
+                return $vf;
+            }
+        }
+
+        abort(404, 'Fungsi tidak ditemukan.');
+    }
+
+    /**
+     * Bangun nama file PDF yang informatif berdasarkan fungsi dan periode.
+     */
+    private function buildPdfFilename(string $fungsi, string $periode, int $bulan, int $tahun): string
+    {
+        $slug = \Illuminate\Support\Str::slug($fungsi);
+
         if (empty($periode)) {
-            return 'rekap-pelapor-business-support-semua-waktu.pdf';
+            return "rekap-pelapor-{$slug}-semua-waktu.pdf";
         }
 
         if ($periode === 'per_bulan') {
             $paddedBulan = str_pad($bulan, 2, '0', STR_PAD_LEFT);
-            return "rekap-pelapor-business-support-{$tahun}-{$paddedBulan}.pdf";
+            return "rekap-pelapor-{$slug}-{$tahun}-{$paddedBulan}.pdf";
         }
 
         $suffix = match ($periode) {
@@ -274,7 +480,7 @@ class DashboardFunctionController extends Controller
             default   => 'semua-waktu',
         };
 
-        return "rekap-pelapor-business-support-{$suffix}.pdf";
+        return "rekap-pelapor-{$slug}-{$suffix}.pdf";
     }
 }
 

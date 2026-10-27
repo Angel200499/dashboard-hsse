@@ -103,7 +103,7 @@
         <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden">
             <!-- Header card -->
             <div class="px-6 pt-5 pb-3 border-b border-slate-100">
-                <h3 class="text-lg font-semibold text-slate-800">1. Jumlah Pelaporan per Fungsi</h3>
+                <h3 class="text-[22px] font-bold text-slate-800">1. Jumlah Pelaporan per Fungsi</h3>
                 <p class="text-xs text-slate-400 mt-0.5">Menampilkan jumlah temuan yang dilaporkan oleh masing-masing fungsi berdasarkan data PEKA.</p>
             </div>
             <!-- Body: chart kiri + panel kanan -->
@@ -196,7 +196,7 @@
             {{-- Header: Judul + Filter in-card --}}
             <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="text-base font-bold text-slate-800">{{ $rrLabel }}</h3>
+                    <h3 class="text-[22px] font-bold text-slate-800">{{ $rrLabel }}</h3>
                     @if($rrMode === 'manpower_rasio')
                         <span class="text-xs font-mono text-slate-400">temuan YTD ÷ (manpower × bulan)</span>
                     @endif
@@ -337,22 +337,22 @@
                 <!-- Safe Action -->
                 <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(0, !c.isDatasetVisible(0)); c.update();">
                     <span class="w-4 h-4 rounded-full bg-[#60a5fa]"></span>
-                    <span class="text-[15px] font-medium text-[#475569]">Safe Action</span>
+                    <span class="text-base font-bold text-slate-800">Safe Action</span>
                 </div>
                 <!-- Safe Condition -->
                 <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(1, !c.isDatasetVisible(1)); c.update();">
                     <span class="w-4 h-4 rounded-full bg-[#fde047]"></span>
-                    <span class="text-[15px] font-medium text-[#475569]">Safe Condition</span>
+                    <span class="text-base font-bold text-slate-800">Safe Condition</span>
                 </div>
                 <!-- Unsafe Action -->
                 <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(2, !c.isDatasetVisible(2)); c.update();">
                     <span class="w-4 h-4 rounded-full bg-[#fdba74]"></span>
-                    <span class="text-[15px] font-medium text-[#475569]">Unsafe Action</span>
+                    <span class="text-base font-bold text-slate-800">Unsafe Action</span>
                 </div>
                 <!-- Unsafe Condition -->
                 <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(3, !c.isDatasetVisible(3)); c.update();">
                     <span class="w-4 h-4 rounded-full bg-[#6ee7b7]"></span>
-                    <span class="text-[15px] font-medium text-[#475569]">Unsafe Condition</span>
+                    <span class="text-base font-bold text-slate-800">Unsafe Condition</span>
                 </div>
                 <!-- Total -->
                 <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity ml-2" onclick="const c = document.getElementById('chartTrending').chartInstance; c.setDatasetVisibility(4, !c.isDatasetVisible(4)); c.update();">
@@ -364,13 +364,13 @@
                         <!-- Titik tengah padat -->
                         <div class="absolute w-3.5 h-3.5 bg-[#fb3f6c] rounded-full"></div>
                     </div>
-                    <span class="text-[15px] font-medium text-[#475569]">Total</span>
+                    <span class="text-base font-bold text-slate-800">Total</span>
                 </div>
             </div>
 
             {{-- Summary Text --}}
             <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-                <p id="trending-summary" class="text-xs text-slate-500 leading-relaxed">
+                <p id="trending-summary" class="text-base font-bold text-slate-800 leading-relaxed">
                     {{-- diisi via JavaScript --}}
                 </p>
             </div>
@@ -380,19 +380,19 @@
 
         <!-- Chart 3: Kategori PEKA (Pie) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="min-height:400px">
-            <h3 class="text-base font-bold text-slate-800 mb-4">3. Kategori PEKA</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-4">3. Kategori PEKA</h3>
             <div class="flex-1 relative w-full" style="min-height:300px">
                 <canvas id="chart3"></canvas>
             </div>
             <!-- Statistik Positif / Negatif -->
-            <div id="chart3-stats" class="mt-4 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 space-y-1 hidden">
-                <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                    <span>Jumlah laporan positif <strong id="chart3-positif">-</strong></span>
+            <div id="chart3-stats" class="mt-4 bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 text-base font-bold text-slate-800 space-y-2 hidden">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block flex-shrink-0"></span>
+                    <span class="font-bold">Jumlah laporan positif <strong id="chart3-positif" class="font-bold text-slate-900">-</strong></span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                    <span>Jumlah laporan negatif <strong id="chart3-negatif">-</strong></span>
+                <div class="flex items-center gap-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block flex-shrink-0"></span>
+                    <span class="font-bold">Jumlah laporan negatif <strong id="chart3-negatif" class="font-bold text-slate-900">-</strong></span>
                 </div>
             </div>
         </div>
@@ -402,12 +402,18 @@
             {{-- Header: Judul + Filter in-card --}}
             <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
                 <div>
-                    <h3 class="text-base font-bold text-slate-800 flex flex-wrap items-center gap-2">
+                    <h3 class="text-[22px] font-bold text-slate-800 flex flex-wrap items-center gap-2">
                         <span>4. Keterlibatan dalam Observasi</span>
                         <span class="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100" title="Klik bar segmen Belum Melapor untuk melihat daftar personil">
                             <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
                             Klik bar untuk daftar personil
                         </span>
+                        <button type="button" id="btn-unreported-all"
+                                onclick="window.openUnreportedModal && window.openUnreportedModal('all')"
+                                class="inline-flex items-center gap-1 text-[11px] text-slate-600 font-medium bg-slate-50 hover:bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 transition"
+                                title="Daftar Belum Melapor untuk seluruh 4 fungsi utama">
+                            Daftar belum melapor — semua fungsi
+                        </button>
                     </h3>
                     <p class="text-xs text-slate-400 mt-0.5">
                         Rumus: Pelapor unik Jan s/d bulan terpilih &divide; Manpower bulan terpilih &times; 100%
@@ -455,7 +461,7 @@
 
         <!-- Chart 5: Persentase Temuan per Fungsi (Stacked Vertical Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">5. Rekap Persentase Temuan per Fungsi</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-4">5. Rekap Persentase Temuan per Fungsi</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart5"></canvas>
             </div>
@@ -463,7 +469,7 @@
 
         <!-- Chart 6: Persentase Penindak Lanjut (Donut) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">6. Rekap Persentase Penindak Lanjut (By SAP)</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-4">6. Rekap Persentase Penindak Lanjut (By SAP)</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart6"></canvas>
             </div>
@@ -471,7 +477,7 @@
 
         <!-- Chart 7: Unsafe Action (Horizontal Bar) -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="height:340px">
-            <h3 class="text-base font-bold text-slate-800 mb-3">7. Unsafe Action Category</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-3">7. Unsafe Action Category</h3>
             <div class="flex-1 relative w-full" style="min-height:0">
                 <canvas id="chart7"></canvas>
             </div>
@@ -479,7 +485,7 @@
 
         <!-- Chart 8: Unsafe Condition (Horizontal Bar) -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="height:600px">
-            <h3 class="text-base font-bold text-slate-800 mb-3">8. Unsafe Condition Category</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-3">8. Unsafe Condition Category</h3>
             <div class="flex-1 relative w-full" style="min-height:0">
                 <canvas id="chart8"></canvas>
             </div>
@@ -541,12 +547,26 @@
             options: {
                 ...commonOptions,
                 plugins: {
-                    legend: { position: 'bottom' },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                size: 16,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            color: '#1e293b',
+                            padding: 16,
+                            boxWidth: 16,
+                            boxHeight: 16
+                        }
+                    },
                     datalabels: {
-                        color: '#333',
+                        color: '#1e293b',
                         font: {
-                            weight: 'normal',
-                            size: 11
+                            weight: 'bold',
+                            size: 16,
+                            family: "'Inter', sans-serif"
                         },
                         formatter: (value) => {
                             if (value === 0 || chart1Total === 0) return null;
@@ -555,6 +575,17 @@
                         }
                     },
                     tooltip: {
+                        titleFont: {
+                            size: 15,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 14,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 12,
                         callbacks: {
                             label: function(ctx) {
                                 const val = ctx.raw;
@@ -606,6 +637,17 @@
                     plugins: { 
                         legend: { display: false },
                         tooltip: {
+                            titleFont: {
+                                size: 15,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            bodyFont: {
+                                size: 14,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            padding: 12,
                             callbacks: {
                                 label: (ctx) => {
                                     const val = ctx.raw;
@@ -617,17 +659,30 @@
                         }
                     },
                     scales: { 
-                        x: { beginAtZero: true, grid: { display: false } },
-                        y: { grid: { display: false } }
+                        x: { 
+                            beginAtZero: true, 
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
+                            }
+                        },
+                        y: { 
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
+                            }
+                        }
                     },
                     animation: {
                         onComplete: function() {
                             var chartInstance = this;
                             var ctx = chartInstance.ctx;
-                            ctx.font = Chart.helpers.fontString(12, 'normal', Chart.defaults.font.family);
+                            ctx.font = "bold 14px 'Inter', sans-serif";
                             ctx.textAlign = 'left';
                             ctx.textBaseline = 'middle';
-                            ctx.fillStyle = '#333';
+                            ctx.fillStyle = '#1e293b';
 
                             this.data.datasets.forEach(function (dataset, i) {
                                 var meta = chartInstance.getDatasetMeta(i);
@@ -792,7 +847,7 @@
                             x: {
                                 stacked: true,
                                 grid: { display: false, drawBorder: false },
-                                ticks: { font: { size: 13, family: "'Inter', sans-serif" }, color: '#64748b' },
+                                ticks: { font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" }, color: '#1e293b' },
                                 border: { display: false }
                             },
                             y: {
@@ -803,15 +858,15 @@
                                 ticks: {
                                     stepSize: 200,
                                     callback: (v) => v.toLocaleString('id-ID'),
-                                    font: { size: 12, family: "'Inter', sans-serif" },
-                                    color: '#64748b',
+                                    font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                    color: '#1e293b',
                                     padding: 10
                                 },
                                 title: {
                                     display: true,
                                     text: 'Temuan',
-                                    font: { size: 14, family: "'Inter', sans-serif", weight: 'bold' },
-                                    color: '#64748b',
+                                    font: { size: 16, family: "'Inter', sans-serif", weight: 'bold' },
+                                    color: '#1e293b',
                                     padding: { bottom: 15 }
                                 }
                             },
@@ -821,6 +876,17 @@
                                 display: false, // Disembunyikan, menggunakan custom HTML legend
                             },
                             tooltip: {
+                                titleFont: {
+                                    size: 15,
+                                    weight: 'bold',
+                                    family: "'Inter', sans-serif"
+                                },
+                                bodyFont: {
+                                    size: 14,
+                                    weight: 'bold',
+                                    family: "'Inter', sans-serif"
+                                },
+                                padding: 12,
                                 callbacks: {
                                     label: function(ctx) {
                                         const val = ctx.raw;
@@ -883,24 +949,51 @@
             options: { 
                 ...commonOptions, 
                 plugins: { 
-                    legend: { position: 'right' },
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            font: {
+                                size: 16,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            color: '#1e293b',
+                            padding: 16,
+                            boxWidth: 16,
+                            boxHeight: 16
+                        }
+                    },
                     datalabels: {
-                        color: '#333',
+                        color: '#1e293b',
                         font: {
-                            weight: 'normal',
-                            size: 11
+                            weight: 'bold',
+                            size: 16,
+                            family: "'Inter', sans-serif"
                         },
                         formatter: (value) => {
                             if (value === 0 || chart3Total === 0) return null;
-                            const pct = Math.round((value / chart3Total) * 100);
+                            const pct = ((value / chart3Total) * 100).toFixed(2).replace('.', ',');
                             return pct + '%';
                         }
                     },
                     tooltip: {
+                        titleFont: {
+                            size: 15,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 14,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 12,
                         callbacks: {
                             label: function(ctx) {
                                 const val = ctx.raw;
-                                const pct = chart3Total > 0 ? Math.round((val / chart3Total) * 100) : 0;
+                                const pct = chart3Total > 0
+                                    ? ((val / chart3Total) * 100).toFixed(2).replace('.', ',')
+                                    : '0,00';
                                 return [
                                     ' ' + val.toLocaleString('id-ID') + ' Pelaporan',
                                     ' ' + pct + '%'
@@ -921,8 +1014,8 @@
             const fmt = (n) => (chart3Total > 0 ? (n / chart3Total * 100).toFixed(2) : '0.00').replace('.', ',');
             const statsEl = document.getElementById('chart3-stats');
             if (statsEl) {
-                document.getElementById('chart3-positif').textContent = fmt(positifTotal) + ' %';
-                document.getElementById('chart3-negatif').textContent  = fmt(negatifTotal)  + ' %';
+                document.getElementById('chart3-positif').textContent = fmt(positifTotal) + '%';
+                document.getElementById('chart3-negatif').textContent  = fmt(negatifTotal)  + '%';
                 statsEl.classList.remove('hidden');
             }
         }
@@ -1000,7 +1093,7 @@
                                 color: '#fff',
                                 anchor: 'center',
                                 align: 'center',
-                                font: { weight: 'bold', size: 12 },
+                                font: { weight: 'bold', size: 16, family: "'Inter', sans-serif" },
                                 formatter: (value, ctx) => {
                                     const key = invLabels[ctx.dataIndex];
                                     if (invRaw[key] === null) return null;
@@ -1022,7 +1115,7 @@
                                 color: '#94A3B8',
                                 anchor: 'center',
                                 align: 'center',
-                                font: { size: 11, style: 'italic' },
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
                                 formatter: () => 'N/A',
                             }
                         }
@@ -1050,16 +1143,47 @@
 
                     },
                     scales: {
-                        x: { stacked: true, grid: { display: false } },
+                        x: { 
+                            stacked: true, 
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
+                            }
+                        },
                         y: {
                             stacked: true,
                             max: 100,
-                            ticks: { callback: v => v + '%' }
+                            ticks: { 
+                                callback: v => v + '%',
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
+                            }
                         }
                     },
                     plugins: {
-                        legend: { position: 'bottom' },
+                        legend: { 
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 16, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b',
+                                padding: 16,
+                                boxWidth: 16,
+                                boxHeight: 16
+                            }
+                        },
                         tooltip: {
+                            titleFont: {
+                                size: 15,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            bodyFont: {
+                                size: 14,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            padding: 12,
                             callbacks: {
                                 label: function(ctx) {
                                     const key = invLabels[ctx.dataIndex];
@@ -1104,7 +1228,7 @@
                             color: '#fff',
                             anchor: 'center',
                             align: 'center',
-                            font: { weight: 'bold', size: 12 },
+                            font: { weight: 'bold', size: 16, family: "'Inter', sans-serif" },
                             formatter: (value) => {
                                 const val = Math.round(value);
                                 return val > 0 ? val + '%' : null;
@@ -1124,12 +1248,47 @@
             options: { 
                 ...commonOptions, 
                 scales: { 
-                    x: { stacked: true, grid: { display: false } }, 
-                    y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } } 
+                    x: { 
+                        stacked: true, 
+                        grid: { display: false },
+                        ticks: {
+                            font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                            color: '#1e293b'
+                        }
+                    }, 
+                    y: { 
+                        stacked: true, 
+                        max: 100, 
+                        ticks: { 
+                            callback: v => v + '%',
+                            font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                            color: '#1e293b'
+                        } 
+                    } 
                 },
                 plugins: {
-                    legend: { position: 'bottom' },
+                    legend: { 
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 16, weight: 'bold', family: "'Inter', sans-serif" },
+                            color: '#1e293b',
+                            padding: 16,
+                            boxWidth: 16,
+                            boxHeight: 16
+                        }
+                    },
                     tooltip: {
+                        titleFont: {
+                            size: 15,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 14,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 12,
                         callbacks: {
                             label: function(ctx) {
                                 const val = ctx.raw;
@@ -1151,10 +1310,37 @@
                     backgroundColor: getBgColors(getLabels(charts.tindak_lanjut)) 
                 }] 
             },
-            options: { ...commonOptions, plugins: { legend: { position: 'right' } } }
+            options: { 
+                ...commonOptions, 
+                plugins: { 
+                    legend: { 
+                        position: 'right',
+                        labels: {
+                            font: { size: 16, weight: 'bold', family: "'Inter', sans-serif" },
+                            color: '#1e293b',
+                            padding: 16,
+                            boxWidth: 16,
+                            boxHeight: 16
+                        }
+                    },
+                    tooltip: {
+                        titleFont: {
+                            size: 15,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 14,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 12
+                    }
+                } 
+            }
         });
 
-        // Helper for Horizontal Bar charts with Data Labels (Percentages)
+        // Helper for Horizontal Bar charts with Data Labels (Percentages & Counts)
         // Urutan kategori mengikuti backend (PHP array order) — TIDAK di-sort by value.
         const renderHorizontalBar = (ctxId, chartData, color) => {
             // Pertahankan urutan dari backend (PHP array order)
@@ -1166,6 +1352,7 @@
             
             new Chart(document.getElementById(ctxId), {
                 type: 'bar',
+                plugins: [ChartDataLabels],
                 data: { 
                     labels: dataArr.map(d => d.label), 
                     datasets: [{ 
@@ -1173,16 +1360,52 @@
                         backgroundColor: color,
                         borderWidth: 0,
                         borderRadius: 4,
-                        barThickness: 18  // fixed agar jarak antar label seragam
+                        barThickness: 18,  // fixed agar jarak antar label seragam
+                        minBarLength: 6    // bar dengan nilai > 0 selalu terlihat & mudah di-hover
                     }] 
                 },
                 options: { 
                     ...commonOptions, 
                     indexAxis: 'y', 
                     maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            right: 70 // ruang agar data label tidak terpotong di tepi kanan
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        axis: 'y',
+                        intersect: false // hover di mana saja sepanjang baris akan memunculkan tooltip
+                    },
                     plugins: { 
                         legend: { display: false },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'right',
+                            color: '#1e293b',
+                            font: {
+                                weight: 'bold',
+                                size: 12,
+                                family: "'Inter', sans-serif"
+                            },
+                            formatter: function(value, context) {
+                                let rawCount = dataArr[context.dataIndex].value;
+                                return `${value}% (${rawCount})`;
+                            }
+                        },
                         tooltip: {
+                            titleFont: {
+                                size: 15,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            bodyFont: {
+                                size: 14,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            padding: 12,
                             callbacks: {
                                 label: function(context) {
                                     let val = context.raw;
@@ -1198,6 +1421,8 @@
                             max: 100,
                             grid: { display: true, color: '#f1f5f9' },
                             ticks: {
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b',
                                 callback: function(value) {
                                     return value + '%';
                                 }
@@ -1205,10 +1430,11 @@
                         }, 
                         y: { 
                             grid: { display: false },
-                            afterFit: (scale) => { scale.width = 300; }, // semua bar mulai dari titik yang sama
+                            afterFit: (scale) => { scale.width = 480; }, // ruang cukup agar seluruh label bilingual panjang tidak terpotong
                             ticks: {
                                 autoSkip: false,
-                                font: { size: 9.5 }  // label bilingual lebih panjang
+                                font: { size: 12, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
                             }
                         } 
                     }

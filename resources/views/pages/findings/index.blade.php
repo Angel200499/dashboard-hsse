@@ -94,11 +94,13 @@
             <table class="w-full text-sm text-left text-slate-500 whitespace-nowrap">
                 <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm">
                     @php
-                        function sortUrl($column) {
-                            $currentSortBy = request('sort_by');
-                            $currentSortDir = request('sort_dir', 'asc');
-                            $newDir = ($currentSortBy === $column && $currentSortDir === 'asc') ? 'desc' : 'asc';
-                            return request()->fullUrlWithQuery(['sort_by' => $column, 'sort_dir' => $newDir]);
+                        if (!function_exists('sortUrl')) {
+                            function sortUrl($column) {
+                                $currentSortBy = request('sort_by');
+                                $currentSortDir = request('sort_dir', 'asc');
+                                $newDir = ($currentSortBy === $column && $currentSortDir === 'asc') ? 'desc' : 'asc';
+                                return request()->fullUrlWithQuery(['sort_by' => $column, 'sort_dir' => $newDir]);
+                            }
                         }
                     @endphp
                     <tr>

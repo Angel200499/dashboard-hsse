@@ -13,7 +13,7 @@ class ExecutiveSummaryPdfService
     ) {}
 
     /**
-     * Generate Executive Summary PDF (2 Pages) matching Mentor's Reference.
+     * Generate Executive Summary PDF (2 Pages, slide 16:9 = 823 x 463 pt) matching Mentor's Reference.
      */
     public function generate(int $tahun = 2026, ?int $bulan = null)
     {
@@ -63,7 +63,7 @@ class ExecutiveSummaryPdfService
 
         // 7. Render PDF via DomPDF
         $pdf = Pdf::loadView('pdf.executive-summary', $data)
-            ->setPaper('a4', 'landscape')
+            ->setPaper([0, 0, 823, 463], 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true);
 
@@ -175,10 +175,18 @@ class ExecutiveSummaryPdfService
 
     /**
      * Build QuickChart configurations for all 8 charts and fetch images concurrently.
+     *
+     * Ukuran ('w' x 'h') setiap grafik dibuat sama dengan ukuran tampil di PDF (satuan pt,
+     * lihat resources/views/pdf/executive-summary.blade.php) agar ukuran font pada grafik
+     * proporsional terhadap referensi mentor. Data/rumus TIDAK diubah — hanya presentasi.
      */
     private function buildChartImages(array $charts, int $tahun, int $bulan, float $closingRate, int $avgKet = 30): array
     {
         $configs = [];
+
+        // Warna teks/axis mengikuti referensi (abu-abu gelap) dan grid abu-abu muda lembut
+        $axisColor = '#595959';
+        $gridColor = 'rgba(120, 120, 120, 0.22)';
 
         // -------------------------------------------------------------
         // Chart 1: Rekap PEKA (Trending Temuan Bulanan Stacked + Line)
@@ -218,9 +226,27 @@ class ExecutiveSummaryPdfService
             }
         }
 
+        $c1Annotations = [];
+        foreach ($c1Total as $idx => $totVal) {
+            if ($totVal !== null && $totVal > 0) {
+                $c1Annotations[] = [
+                    'type'            => 'box',
+                    'drawTime'        => 'beforeDatasetsDraw',
+                    'xScaleID'        => 'x-axis-0',
+                    'yScaleID'        => 'y-axis-0',
+                    'xMin'            => round($idx - 0.29, 2),
+                    'xMax'            => round($idx + 0.29, 2),
+                    'yMin'            => 0,
+                    'yMax'            => $totVal,
+                    'backgroundColor' => 'rgba(162, 216, 168, 0.20)',
+                    'borderWidth'     => 0,
+                ];
+            }
+        }
+
         $configs['chart1'] = [
-            'w' => 420, 'h' => 205,
-            'cfg' => [
+            'w' => 262, 'h' => 130,
+            'cfg' => $this->jsConfig([
                 'type' => 'bar',
                 'data' => [
                     'labels' => $c1Labels,
@@ -229,77 +255,102 @@ class ExecutiveSummaryPdfService
                             'type' => 'bar',
                             'label' => 'Safe Action',
                             'data' => $c1SafeAction,
-                            'backgroundColor' => '#5AA2D7',
+                            'backgroundColor' => '#529C9B',
                             'stack' => 'stack0',
+                            'barPercentage' => 0.65,
+                            'categoryPercentage' => 0.85,
                         ],
                         [
                             'type' => 'bar',
                             'label' => 'Safe Condition',
                             'data' => $c1SafeCondition,
-                            'backgroundColor' => '#FFF2CC',
-                            'borderColor' => '#FFE599',
-                            'borderWidth' => 1,
+                            'backgroundColor' => '#F8E485',
                             'stack' => 'stack0',
+                            'barPercentage' => 0.65,
+                            'categoryPercentage' => 0.85,
                         ],
                         [
                             'type' => 'bar',
                             'label' => 'Unsafe Action',
                             'data' => $c1UnsafeAction,
-                            'backgroundColor' => '#F8CBAD',
-                            'borderColor' => '#F4B084',
-                            'borderWidth' => 1,
+                            'backgroundColor' => '#F7B080',
                             'stack' => 'stack0',
+                            'barPercentage' => 0.65,
+                            'categoryPercentage' => 0.85,
                         ],
                         [
                             'type' => 'bar',
                             'label' => 'Unsafe Condition',
                             'data' => $c1UnsafeCondition,
-                            'backgroundColor' => '#A9D18E',
-                            'borderColor' => '#8EA9DB',
-                            'borderWidth' => 1,
+                            'backgroundColor' => '#A2E2D4',
                             'stack' => 'stack0',
+                            'barPercentage' => 0.65,
+                            'categoryPercentage' => 0.85,
                         ],
                         [
                             'type' => 'line',
                             'label' => 'Total',
                             'data' => $c1Total,
-                            'borderColor' => '#C00000',
-                            'backgroundColor' => '#C00000',
+                            'borderColor' => '#B85C70',
+                            'backgroundColor' => '#B85C70',
                             'fill' => false,
-                            'borderWidth' => 2,
-                            'pointRadius' => 3,
-                            'pointBackgroundColor' => '#C00000',
-                            'yAxisID' => 'y',
+                            'borderWidth' => 1.4,
+                            'pointRadius' => 2.2,
+                            'pointBackgroundColor' => '#B85C70',
+                            'lineTension' => 0.2,
                         ],
                     ]
                 ],
                 'options' => [
+                    'layout' => ['padding' => ['left' => 0, 'right' => 4, 'top' => 4, 'bottom' => 0]],
                     'legend' => [
                         'position' => 'bottom',
-                        'labels' => ['fontSize' => 6.5, 'boxWidth' => 7, 'padding' => 2]
+                        'labels' => [
+                            'fontSize' => 6,
+                            'boxWidth' => 6,
+                            'padding' => 4,
+                            'fontColor' => $axisColor,
+                        ]
                     ],
                     'scales' => [
-                        'xAxes' => [['stacked' => true, 'gridLines' => ['display' => false], 'ticks' => ['fontSize' => 7]]],
+                        'xAxes' => [[
+                            'stacked' => true,
+                            'gridLines' => ['display' => false],
+                            'ticks' => ['fontSize' => 6.5, 'fontColor' => $axisColor, 'maxRotation' => 0, 'minRotation' => 0]
+                        ]],
                         'yAxes' => [[
-                            'id' => 'y',
                             'stacked' => true,
                             'scaleLabel' => [
                                 'display' => true,
                                 'labelString' => 'Temuan',
-                                'fontSize' => 8,
-                                'fontStyle' => 'bold',
-                                'fontColor' => '#555555'
+                                'fontSize' => 7,
+                                'fontStyle' => 'normal',
+                                'fontColor' => $axisColor
                             ],
-                            'ticks' => ['beginAtZero' => true, 'fontSize' => 7]
+                            'gridLines' => [
+                                'color' => $gridColor,
+                                'lineWidth' => 0.4,
+                                'zeroLineColor' => '#bfbfbf',
+                                'zeroLineWidth' => 0.8,
+                            ],
+                            'ticks' => [
+                                'beginAtZero' => true,
+                                'fontSize' => 6.5,
+                                'fontColor' => $axisColor,
+                                'callback' => '__THOUSAND__',
+                            ]
                         ]]
                     ],
-                    'plugins' => ['datalabels' => ['display' => false]]
+                    'plugins' => ['datalabels' => ['display' => false]],
+                    'annotation' => [
+                        'annotations' => $c1Annotations
+                    ]
                 ]
-            ]
+            ])
         ];
 
         // -------------------------------------------------------------
-        // Chart 2: Reporting Rate per Fungsi (Horizontal Bar with JS functions)
+        // Chart 2: Reporting Rate per Fungsi (Horizontal Bar)
         // -------------------------------------------------------------
         $rrDataMap = $charts['reporting']['data'] ?? [];
         $rrLhdRate = $charts['reporting_lhd']['rate'] ?? ($rrDataMap['AREA LHD'] ?? 0);
@@ -313,64 +364,67 @@ class ExecutiveSummaryPdfService
         ];
         $maxVal = max($rrData);
         $xMax = ceil(max(6, $maxVal + 1));
-        $rrDataJson = json_encode($rrData);
 
         $configs['chart2'] = [
-            'w' => 380, 'h' => 200,
-            'cfg' => "{
-                type: 'horizontalBar',
-                data: {
-                    labels: ['AREA LHD', 'Operation', 'Maintenance', 'HSSE', 'Bussiness Support'],
-                    datasets: [{
-                        data: {$rrDataJson},
-                        backgroundColor: ['#001F5B', '#2B579A', '#ED7D31', '#A6A6A6', '#FFC000'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    legend: { display: false },
-                    scales: {
-                        xAxes: [{
-                            ticks: {
-                                beginAtZero: true,
-                                max: {$xMax},
-                                stepSize: 1,
-                                fontSize: 7.5,
-                                callback: (val) => Number(val).toFixed(2).replace('.', ',')
-                            },
-                            gridLines: { color: '#f1f5f9', display: true }
-                        }],
-                        yAxes: [{
-                            ticks: { fontSize: 7.5, fontColor: '#475569' },
-                            gridLines: { display: false }
-                        }]
-                    },
-                    plugins: {
-                        datalabels: {
-                            display: true,
-                            anchor: 'end',
-                            align: 'right',
-                            color: '#1e293b',
-                            font: { size: 7.5, weight: 'bold' },
-                            formatter: (val) => Number(val).toFixed(2).replace('.', ',')
-                        }
-                    },
-                    annotation: {
-                        annotations: [{
-                            type: 'line',
-                            mode: 'vertical',
-                            scaleID: 'x-axis-0',
-                            value: 1.0,
-                            borderColor: '#dc2626',
-                            borderWidth: 1.5
-                        }]
-                    }
-                }
-            }"
+            'w' => 245, 'h' => 112,
+            'cfg' => $this->jsConfig([
+                'type' => 'horizontalBar',
+                'data' => [
+                    'labels' => $rrLabels,
+                    'datasets' => [[
+                        'data' => $rrData,
+                        'backgroundColor' => ['#001F5B', '#2B579A', '#ED7D31', '#A6A6A6', '#FFC000'],
+                        'borderWidth' => 0,
+                        'barPercentage' => 0.5,
+                        'categoryPercentage' => 0.9,
+                    ]]
+                ],
+                'options' => [
+                    'layout' => ['padding' => ['left' => 0, 'right' => 6, 'top' => 2, 'bottom' => 0]],
+                    'legend' => ['display' => false],
+                    'scales' => [
+                        'xAxes' => [[
+                            'ticks' => [
+                                'beginAtZero' => true,
+                                'max' => $xMax,
+                                'stepSize' => 1,
+                                'fontSize' => 6.5,
+                                'fontColor' => $axisColor,
+                                'callback' => '__RRFMT__',
+                            ],
+                            'gridLines' => ['display' => false]
+                        ]],
+                        'yAxes' => [[
+                            'ticks' => ['fontSize' => 6.5, 'fontColor' => $axisColor],
+                            'gridLines' => ['display' => false]
+                        ]]
+                    ],
+                    'plugins' => [
+                        'datalabels' => [
+                            'display' => true,
+                            'anchor' => 'end',
+                            'align' => 'right',
+                            'color' => '#404040',
+                            'font' => ['size' => 6.5, 'weight' => 'normal'],
+                            'formatter' => '__RRFMT__',
+                        ]
+                    ],
+                    'annotation' => [
+                        'annotations' => [[
+                            'type' => 'line',
+                            'mode' => 'vertical',
+                            'scaleID' => 'x-axis-0',
+                            'value' => 1.0,
+                            'borderColor' => '#dc2626',
+                            'borderWidth' => 1.2
+                        ]]
+                    ]
+                ]
+            ])
         ];
 
         // -------------------------------------------------------------
-        // Chart 3: Kategori PEKA (Pie Chart with direct % values via JS)
+        // Chart 3: Kategori PEKA (Pie Chart with direct % values)
         // -------------------------------------------------------------
         $kat = $charts['kategori'] ?? [];
         $katRawValues = [
@@ -381,35 +435,38 @@ class ExecutiveSummaryPdfService
         ];
         $katSum = array_sum($katRawValues);
         $katPctValues = array_map(fn($v) => $katSum > 0 ? round(($v / $katSum) * 100) : 0, $katRawValues);
-        $katDataJson = json_encode($katPctValues);
 
         $configs['chart3'] = [
-            'w' => 380, 'h' => 200,
-            'cfg' => "{
-                type: 'pie',
-                data: {
-                    labels: ['Safe Action', 'Safe Condition', 'Unsafe Action', 'Unsafe Condition'],
-                    datasets: [{
-                        data: {$katDataJson},
-                        backgroundColor: ['#2B579A', '#ED7D31', '#A6A6A6', '#FFC000'],
-                        borderColor: '#ffffff',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    legend: {
-                        position: 'right',
-                        labels: { fontSize: 7.5, boxWidth: 8, padding: 4 }
-                    },
-                    plugins: {
-                        datalabels: {
-                            color: ['#ffffff', '#ffffff', '#ffffff', '#1e293b'],
-                            font: { size: 9, weight: 'bold' },
-                            formatter: (val) => val > 0 ? val + '%' : ''
-                        }
-                    }
-                }
-            }"
+            'w' => 232, 'h' => 96,
+            'cfg' => $this->jsConfig([
+                'type' => 'pie',
+                'data' => [
+                    'labels' => ['Safe Action', 'Safe Condition', 'Unsafe Action', 'Unsafe Condition'],
+                    'datasets' => [[
+                        'data' => $katPctValues,
+                        'backgroundColor' => ['#2B579A', '#ED7D31', '#A6A6A6', '#FFC000'],
+                        'borderColor' => '#ffffff',
+                        'borderWidth' => 1,
+                    ]]
+                ],
+                'options' => [
+                    'layout' => ['padding' => ['left' => 0, 'right' => 14, 'top' => 4, 'bottom' => 4]],
+                    'legend' => [
+                        'position' => 'right',
+                        'labels' => ['fontSize' => 6.5, 'boxWidth' => 6, 'padding' => 6, 'fontColor' => $axisColor]
+                    ],
+                    'plugins' => [
+                        'datalabels' => [
+                            'color' => '__PIECOLOR__',
+                            'anchor' => '__PIEANCHOR__',
+                            'align' => '__PIEANCHOR__',
+                            'offset' => 1,
+                            'font' => ['size' => 7.5, 'weight' => 'bold'],
+                            'formatter' => '__PIEFMT__',
+                        ]
+                    ]
+                ]
+            ])
         ];
 
         // -------------------------------------------------------------
@@ -421,60 +478,75 @@ class ExecutiveSummaryPdfService
         $ptOpen = [];
         foreach ($ptLabels as $f) {
             $fKey = ($f === 'Bussiness Support') ? 'Business Support' : $f;
-            $c = round((float) ($pt[$fKey]['closed'] ?? ($pt[$f]['closed'] ?? 0)));
+            $c = round((float) ($pt[$fKey]['closed'] ?? ($pt[$f]['closed'] ?? 0)), 1);
             $ptClosed[] = $c;
-            $ptOpen[] = max(0, 100 - $c);
+            $ptOpen[] = max(0, round(100 - $c, 1));
         }
-        $ptClosedJson = json_encode($ptClosed);
-        $ptOpenJson = json_encode($ptOpen);
 
         $configs['chart4'] = [
-            'w' => 380, 'h' => 200,
-            'cfg' => "{
-                type: 'bar',
-                data: {
-                    labels: ['Operation', 'Maintenance', 'HSSE', 'Bussiness Support'],
-                    datasets: [
-                        {
-                            label: 'Closed',
-                            data: {$ptClosedJson},
-                            backgroundColor: '#548235',
-                            datalabels: {
-                                display: true,
-                                color: '#ffffff',
-                                anchor: 'center',
-                                align: 'center',
-                                font: { size: 8, weight: 'bold' },
-                                formatter: (val) => val + '%'
-                            }
-                        },
-                        {
-                            label: 'TOTAL',
-                            data: {$ptOpenJson},
-                            backgroundColor: '#FFC000',
-                            datalabels: { display: false }
-                        }
+            'w' => 228, 'h' => 124,
+            'cfg' => $this->jsConfig([
+                'type' => 'bar',
+                'data' => [
+                    'labels' => ['Operation', 'Maintenance', 'HSSE', ['Bussiness', 'Support']],
+                    'datasets' => [
+                        [
+                            'label' => 'Closed',
+                            'data' => $ptClosed,
+                            'backgroundColor' => '#548235',
+                            'barPercentage' => 0.55,
+                            'categoryPercentage' => 0.9,
+                            'datalabels' => [
+                                'display' => true,
+                                'color' => '#ffffff',
+                                'anchor' => 'center',
+                                'align' => 'center',
+                                'font' => ['size' => 6, 'weight' => 'bold'],
+                                'formatter' => '__PCTCOMMA__',
+                            ]
+                        ],
+                        [
+                            'label' => 'TOTAL',
+                            'data' => $ptOpen,
+                            'backgroundColor' => '#FFC000',
+                            'barPercentage' => 0.55,
+                            'categoryPercentage' => 0.9,
+                            'datalabels' => ['display' => false]
+                        ]
                     ]
-                },
-                options: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { fontSize: 7.5, boxWidth: 8, padding: 4 }
-                    },
-                    scales: {
-                        xAxes: [{ stacked: true, gridLines: { display: false }, ticks: { fontSize: 7.5 } }],
-                        yAxes: [{
-                            stacked: true,
-                            ticks: {
-                                max: 100,
-                                beginAtZero: true,
-                                fontSize: 7.5,
-                                callback: (val) => val + '%'
-                            }
-                        }]
-                    }
-                }
-            }"
+                ],
+                'options' => [
+                    'layout' => ['padding' => ['left' => 0, 'right' => 4, 'top' => 2, 'bottom' => 0]],
+                    'legend' => [
+                        'position' => 'bottom',
+                        'labels' => ['fontSize' => 6.5, 'boxWidth' => 6, 'padding' => 6, 'fontColor' => $axisColor]
+                    ],
+                    'scales' => [
+                        'xAxes' => [[
+                            'stacked' => true,
+                            'gridLines' => ['display' => false],
+                            'ticks' => ['fontSize' => 6.5, 'fontColor' => $axisColor, 'maxRotation' => 0, 'minRotation' => 0]
+                        ]],
+                        'yAxes' => [[
+                            'stacked' => true,
+                            'gridLines' => [
+                                'color' => $gridColor,
+                                'lineWidth' => 0.4,
+                                'zeroLineColor' => $gridColor,
+                                'zeroLineWidth' => 0.4,
+                            ],
+                            'ticks' => [
+                                'max' => 100,
+                                'beginAtZero' => true,
+                                'stepSize' => 20,
+                                'fontSize' => 6.5,
+                                'fontColor' => $axisColor,
+                                'callback' => '__PCT__',
+                            ]
+                        ]]
+                    ]
+                ]
+            ])
         ];
 
         // -------------------------------------------------------------
@@ -485,8 +557,8 @@ class ExecutiveSummaryPdfService
         if ($tlTotal === 0) {
             // Tidak ada data SAP — tampilkan donut kosong dengan label placeholder
             $configs['chart5'] = [
-                'w' => 260, 'h' => 200,
-                'cfg' => [
+                'w' => 178, 'h' => 142,
+                'cfg' => $this->jsConfig([
                     'type' => 'doughnut',
                     'data' => [
                         'labels' => ['Tidak ada data SAP'],
@@ -502,11 +574,11 @@ class ExecutiveSummaryPdfService
                         'legend' => [
                             'display' => true,
                             'position' => 'bottom',
-                            'labels' => ['fontSize' => 7, 'boxWidth' => 8, 'padding' => 3]
+                            'labels' => ['fontSize' => 6.5, 'boxWidth' => 6, 'padding' => 3, 'fontColor' => $axisColor]
                         ],
                         'plugins' => ['datalabels' => ['display' => false]]
                     ]
-                ]
+                ])
             ];
         } else {
             $colorMap = [
@@ -527,43 +599,41 @@ class ExecutiveSummaryPdfService
                 }
             }
 
-            $tlLabelsJson = json_encode($tlLabels);
-            $tlValuesJson = json_encode($tlValues);
-            $tlColorsJson = json_encode($tlColors);
-
             $configs['chart5'] = [
-                'w' => 260, 'h' => 200,
-                'cfg' => "{
-                    type: 'outlabeledDoughnut',
-                    data: {
-                        labels: {$tlLabelsJson},
-                        datasets: [{
-                            data: {$tlValuesJson},
-                            backgroundColor: {$tlColorsJson},
-                            borderColor: '#ffffff',
-                            borderWidth: 2
-                        }]
-                    },
-                    options: {
-                        cutoutPercentage: 55,
-                        plugins: {
-                            legend: false,
-                            outlabels: {
-                                text: '%l %p',
-                                color: '#1e293b',
-                                stretch: 15,
-                                font: { size: 8, weight: 'bold' },
-                                lineColor: '#94a3b8',
-                                lineWidth: 1,
-                                padding: 2,
-                                backgroundColor: '#ffffff',
-                                borderColor: '#cbd5e1',
-                                borderWidth: 1,
-                                borderRadius: 3
-                            }
-                        }
-                    }
-                }"
+                'w' => 178, 'h' => 142,
+                'cfg' => $this->jsConfig([
+                    'type' => 'outlabeledDoughnut',
+                    'data' => [
+                        'labels' => $tlLabels,
+                        'datasets' => [[
+                            'data' => $tlValues,
+                            'backgroundColor' => $tlColors,
+                            'borderColor' => '#ffffff',
+                            'borderWidth' => 1,
+                        ]]
+                    ],
+                    'options' => [
+                        'cutoutPercentage' => 58,
+                        'zoomOutPercentage' => 0,
+                        'layout' => ['padding' => ['top' => 24, 'bottom' => 8, 'left' => 2, 'right' => 2]],
+                        'plugins' => [
+                            'legend' => false,
+                            'outlabels' => [
+                                'text' => "%l\n%p",
+                                'color' => '#404040',
+                                'stretch' => 2,
+                                'font' => ['size' => 6.5, 'resizable' => false],
+                                'lineColor' => '#a6a6a6',
+                                'lineWidth' => 1,
+                                'padding' => 2,
+                                'backgroundColor' => '#ffffff',
+                                'borderColor' => '#bfbfbf',
+                                'borderWidth' => 1,
+                                'borderRadius' => 0,
+                            ]
+                        ]
+                    ]
+                ])
             ];
         }
 
@@ -588,66 +658,81 @@ class ExecutiveSummaryPdfService
             }
         }
         $avgKetVal = $ketCount > 0 ? round($ketSum / $ketCount) : $avgKet;
-        $ketDataJson = json_encode($ketData);
-        $remDataJson = json_encode($remData);
 
         $configs['chart6'] = [
-            'w' => 380, 'h' => 200,
-            'cfg' => "{
-                type: 'bar',
-                data: {
-                    labels: ['Operation', 'Maintenance', 'HSSE', 'Bussiness Support'],
-                    datasets: [
-                        {
-                            label: 'Keterlibatan',
-                            data: {$ketDataJson},
-                            backgroundColor: '#ED7D31',
-                            datalabels: {
-                                display: true,
-                                color: '#ffffff',
-                                anchor: 'center',
-                                align: 'center',
-                                font: { size: 8, weight: 'bold' },
-                                formatter: (val) => val + '%'
-                            }
-                        },
-                        {
-                            label: 'Jumlah',
-                            data: {$remDataJson},
-                            backgroundColor: '#4472C4',
-                            datalabels: { display: false }
-                        }
+            'w' => 238, 'h' => 126,
+            'cfg' => $this->jsConfig([
+                'type' => 'bar',
+                'data' => [
+                    'labels' => $ketLabels,
+                    'datasets' => [
+                        [
+                            'label' => 'Keterlibatan',
+                            'data' => $ketData,
+                            'backgroundColor' => '#ED7D31',
+                            'barPercentage' => 0.55,
+                            'categoryPercentage' => 0.9,
+                            'datalabels' => [
+                                'display' => true,
+                                'color' => '#ffffff',
+                                'anchor' => 'center',
+                                'align' => 'center',
+                                'font' => ['size' => 6, 'weight' => 'bold'],
+                                'formatter' => '__PCT__',
+                            ]
+                        ],
+                        [
+                            'label' => 'Jumlah',
+                            'data' => $remData,
+                            'backgroundColor' => '#4472C4',
+                            'barPercentage' => 0.55,
+                            'categoryPercentage' => 0.9,
+                            'datalabels' => ['display' => false]
+                        ]
                     ]
-                },
-                options: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { fontSize: 7.5, boxWidth: 8, padding: 4 }
-                    },
-                    scales: {
-                        xAxes: [{ stacked: true, gridLines: { display: false }, ticks: { fontSize: 7.5 } }],
-                        yAxes: [{
-                            stacked: true,
-                            ticks: {
-                                max: 100,
-                                beginAtZero: true,
-                                fontSize: 7.5,
-                                callback: (val) => val + '%'
-                            }
-                        }]
-                    },
-                    annotation: {
-                        annotations: [{
-                            type: 'line',
-                            mode: 'horizontal',
-                            scaleID: 'y-axis-0',
-                            value: {$avgKetVal},
-                            borderColor: '#dc2626',
-                            borderWidth: 1.5
-                        }]
-                    }
-                }
-            }"
+                ],
+                'options' => [
+                    'layout' => ['padding' => ['left' => 0, 'right' => 4, 'top' => 2, 'bottom' => 0]],
+                    'legend' => [
+                        'position' => 'bottom',
+                        'labels' => ['fontSize' => 6.5, 'boxWidth' => 6, 'padding' => 6, 'fontColor' => $axisColor]
+                    ],
+                    'scales' => [
+                        'xAxes' => [[
+                            'stacked' => true,
+                            'gridLines' => ['display' => false],
+                            'ticks' => ['fontSize' => 6, 'fontColor' => $axisColor, 'maxRotation' => 0, 'minRotation' => 0]
+                        ]],
+                        'yAxes' => [[
+                            'stacked' => true,
+                            'gridLines' => [
+                                'color' => $gridColor,
+                                'lineWidth' => 0.4,
+                                'zeroLineColor' => $gridColor,
+                                'zeroLineWidth' => 0.4,
+                            ],
+                            'ticks' => [
+                                'max' => 100,
+                                'beginAtZero' => true,
+                                'stepSize' => 20,
+                                'fontSize' => 6.5,
+                                'fontColor' => $axisColor,
+                                'callback' => '__PCT__',
+                            ]
+                        ]]
+                    ],
+                    'annotation' => [
+                        'annotations' => [[
+                            'type' => 'line',
+                            'mode' => 'horizontal',
+                            'scaleID' => 'y-axis-0',
+                            'value' => $avgKetVal,
+                            'borderColor' => '#dc2626',
+                            'borderWidth' => 1.2
+                        ]]
+                    ]
+                ]
+            ])
         ];
 
         // -------------------------------------------------------------
@@ -686,46 +771,67 @@ class ExecutiveSummaryPdfService
         }
         $uaPct = array_map(fn($v) => $uaTotal > 0 ? round(($v / $uaTotal) * 100, 1) : 0, $uaValues);
 
-        // Format labels menjadi 2 baris jika ada ' / '
-        $uaLabels = array_map(function($lbl) {
-            if (str_contains($lbl, ' / ')) {
-                return explode(' / ', $lbl, 2);
-            }
-            return $lbl;
-        }, $uaRawLabels);
+        // Label tetap satu teks "Indonesia / English" (seperti referensi), dibungkus otomatis per baris
+        $uaLabels = array_map(fn($lbl) => $this->wrapLabel($lbl, 40), $uaRawLabels);
+        // Batas sumbu X dinamis (kelipatan 10) agar batang tidak terpotong
+        $uaAxisMax = max(10, (floor(max($uaPct ?: [0]) / 10) + 1) * 10);
 
         $configs['chart7'] = [
-            'w' => 520, 'h' => 340,
-            'cfg' => [
+            'w' => 333, 'h' => 324,
+            'cfg' => $this->jsConfig([
                 'type' => 'horizontalBar',
                 'data' => [
                     'labels' => $uaLabels,
                     'datasets' => [[
-                        'label' => 'Series1',
+                        'label' => 'Series2',
                         'data' => $uaPct,
                         'backgroundColor' => '#ED7D31',
-                        'borderWidth' => 0
+                        'borderWidth' => 0,
+                        'barPercentage' => 0.22,
+                        'categoryPercentage' => 1.0,
                     ]]
                 ],
                 'options' => [
-                    'layout' => ['padding' => ['left' => 15, 'right' => 20]],
+                    'layout' => ['padding' => ['left' => 6, 'right' => 14, 'top' => 6, 'bottom' => 4]],
+                    'title' => [
+                        'display' => true,
+                        'text' => 'Unsafe Action Category',
+                        'fontSize' => 9,
+                        'fontStyle' => 'bold italic',
+                        'fontColor' => '#7f7f7f',
+                        'padding' => 12,
+                    ],
                     'legend' => [
                         'position' => 'bottom',
-                        'labels' => ['fontSize' => 8, 'boxWidth' => 10, 'padding' => 4]
+                        'labels' => ['fontSize' => 7, 'boxWidth' => 7, 'padding' => 6, 'fontColor' => $axisColor]
                     ],
                     'scales' => [
                         'xAxes' => [[
-                            'ticks' => ['beginAtZero' => true, 'max' => 80, 'fontSize' => 8],
-                            'gridLines' => ['color' => '#f1f5f9']
+                            'ticks' => [
+                                'beginAtZero' => true,
+                                'max' => $uaAxisMax,
+                                'stepSize' => 10,
+                                'fontSize' => 7,
+                                'fontColor' => $axisColor,
+                                'minRotation' => 0,
+                                'maxRotation' => 0,
+                                'callback' => '__PCT__',
+                            ],
+                            'gridLines' => [
+                                'color' => $gridColor,
+                                'lineWidth' => 0.4,
+                                'zeroLineColor' => $gridColor,
+                                'zeroLineWidth' => 0.4,
+                            ]
                         ]],
                         'yAxes' => [[
-                            'ticks' => ['fontSize' => 7.5],
+                            'ticks' => ['fontSize' => 7, 'fontColor' => $axisColor, 'padding' => 4],
                             'gridLines' => ['display' => false]
                         ]]
                     ],
                     'plugins' => ['datalabels' => ['display' => false]]
                 ]
-            ]
+            ])
         ];
 
         // -------------------------------------------------------------
@@ -772,52 +878,103 @@ class ExecutiveSummaryPdfService
         }
         $ucPct = array_map(fn($v) => $ucTotal > 0 ? round(($v / $ucTotal) * 100, 1) : 0, $ucValues);
 
-        // Format labels menjadi 2 baris jika ada ' / '
-        $ucLabels = array_map(function($lbl) {
-            if (str_contains($lbl, ' / ')) {
-                return explode(' / ', $lbl, 2);
-            } elseif (str_contains($lbl, '/')) {
-                return explode('/', $lbl, 2);
-            }
-            return $lbl;
-        }, $ucRawLabels);
+        $ucLabels = array_map(fn($lbl) => $this->wrapLabel($lbl, 40), $ucRawLabels);
+        // Batas sumbu X dinamis (kelipatan 5) agar batang tidak terpotong
+        $ucAxisMax = max(5, (floor(max($ucPct ?: [0]) / 5) + 1) * 5);
 
         $configs['chart8'] = [
-            'w' => 520, 'h' => 340,
-            'cfg' => [
+            'w' => 343, 'h' => 324,
+            'cfg' => $this->jsConfig([
                 'type' => 'horizontalBar',
                 'data' => [
                     'labels' => $ucLabels,
                     'datasets' => [[
-                        'label' => 'Series1',
+                        'label' => 'Series2',
                         'data' => $ucPct,
                         'backgroundColor' => '#ED7D31',
-                        'borderWidth' => 0
+                        'borderWidth' => 0,
+                        'barPercentage' => 0.22,
+                        'categoryPercentage' => 1.0,
                     ]]
                 ],
                 'options' => [
-                    'layout' => ['padding' => ['left' => 15, 'right' => 20]],
+                    'layout' => ['padding' => ['left' => 6, 'right' => 14, 'top' => 6, 'bottom' => 4]],
+                    'title' => [
+                        'display' => true,
+                        'text' => 'Unsafe Condition Category',
+                        'fontSize' => 9,
+                        'fontStyle' => 'bold italic',
+                        'fontColor' => '#7f7f7f',
+                        'padding' => 12,
+                    ],
                     'legend' => [
                         'position' => 'bottom',
-                        'labels' => ['fontSize' => 8, 'boxWidth' => 10, 'padding' => 4]
+                        'labels' => ['fontSize' => 7, 'boxWidth' => 7, 'padding' => 6, 'fontColor' => $axisColor]
                     ],
                     'scales' => [
                         'xAxes' => [[
-                            'ticks' => ['beginAtZero' => true, 'max' => 40, 'fontSize' => 8],
-                            'gridLines' => ['color' => '#f1f5f9']
+                            'ticks' => [
+                                'beginAtZero' => true,
+                                'max' => $ucAxisMax,
+                                'stepSize' => 5,
+                                'fontSize' => 7,
+                                'fontColor' => $axisColor,
+                                'minRotation' => 0,
+                                'maxRotation' => 0,
+                                'callback' => '__PCT__',
+                            ],
+                            'gridLines' => [
+                                'color' => $gridColor,
+                                'lineWidth' => 0.4,
+                                'zeroLineColor' => $gridColor,
+                                'zeroLineWidth' => 0.4,
+                            ]
                         ]],
                         'yAxes' => [[
-                            'ticks' => ['fontSize' => 6.8],
+                            'ticks' => ['fontSize' => 7, 'fontColor' => $axisColor, 'padding' => 4],
                             'gridLines' => ['display' => false]
                         ]]
                     ],
                     'plugins' => ['datalabels' => ['display' => false]]
                 ]
-            ]
+            ])
         ];
 
         // Fetch all chart images in parallel via curl_multi
         return $this->fetchParallelCharts($configs);
+    }
+
+    /**
+     * Encode konfigurasi Chart.js menjadi string JS untuk QuickChart.
+     * Placeholder "__NAMA__" (string) diganti dengan fungsi JavaScript sungguhan.
+     */
+    private function jsConfig(array $cfg): string
+    {
+        $json = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+
+        $fns = [
+            '__PCT__'           => "(v) => v + '%'",
+            '__PCTCOMMA__'      => "(v) => String(v).replace('.', ',') + '%'",
+            '__RRFMT__'         => "(v) => Number(v).toFixed(2).replace('.', ',')",
+            '__THOUSAND__'      => "(v) => String(v).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',')",
+            '__PIEFMT__'        => "(v) => v > 0 ? v + '%' : ''",
+            '__PIEANCHOR__'     => "(ctx) => ctx.dataset.data[ctx.dataIndex] < 5 ? 'end' : 'center'",
+            '__PIECOLOR__'      => "(ctx) => { var v = ctx.dataset.data[ctx.dataIndex]; return v < 5 ? '#404040' : (ctx.dataIndex === 3 ? '#262626' : '#ffffff'); }",
+            '__FILTER_LEGEND__' => "(item) => item.text !== '_total_bar_'",
+        ];
+        foreach ($fns as $placeholder => $js) {
+            $json = str_replace('"' . $placeholder . '"', $js, $json);
+        }
+
+        return $json;
+    }
+
+    /**
+     * Bungkus label panjang menjadi beberapa baris (array) untuk label sumbu Chart.js.
+     */
+    private function wrapLabel(string $label, int $width): array
+    {
+        return explode("\n", wordwrap($label, $width, "\n", false));
     }
 
     /**
@@ -837,7 +994,7 @@ class ExecutiveSummaryPdfService
                 'chart'            => $cfg,
                 'width'            => $w,
                 'height'           => $h,
-                'devicePixelRatio' => 2,
+                'devicePixelRatio' => 3,
                 'backgroundColor'  => 'transparent',
             ];
 
@@ -846,7 +1003,7 @@ class ExecutiveSummaryPdfService
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
             curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_multi_add_handle($mh, $ch);
             $handles[$key] = $ch;
@@ -865,8 +1022,14 @@ class ExecutiveSummaryPdfService
             if ($httpCode === 200 && !empty($raw)) {
                 $images[$key] = 'data:image/png;base64,' . base64_encode($raw);
             } else {
-                Log::warning("QuickChart failed for {$key}, HTTP code: {$httpCode}");
-                $images[$key] = null;
+                // Single retry if timed out
+                $retryRaw = $this->fetchSingleChart($configs[$key]);
+                if ($retryRaw) {
+                    $images[$key] = 'data:image/png;base64,' . base64_encode($retryRaw);
+                } else {
+                    Log::warning("QuickChart failed for {$key}, HTTP code: {$httpCode}");
+                    $images[$key] = null;
+                }
             }
             curl_multi_remove_handle($mh, $ch);
             curl_close($ch);
@@ -874,5 +1037,30 @@ class ExecutiveSummaryPdfService
         curl_multi_close($mh);
 
         return $images;
+    }
+
+    /**
+     * Fallback single chart fetch if parallel fetch timed out.
+     */
+    private function fetchSingleChart(array $item): ?string
+    {
+        $postData = [
+            'chart'            => $item['cfg'],
+            'width'            => $item['w'],
+            'height'           => $item['h'],
+            'devicePixelRatio' => 3,
+            'backgroundColor'  => 'transparent',
+        ];
+        $ch = curl_init('https://quickchart.io/chart');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $res = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return ($code === 200 && !empty($res)) ? $res : null;
     }
 }

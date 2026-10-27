@@ -218,22 +218,23 @@
     <table class="rekap-table">
         <thead>
             <tr>
-                <th style="width:24px;text-align:center;">No</th>
-                <th class="col-fungsi" style="width:90px;">Fungsi</th>
+                <th style="width:20px;text-align:center;">No</th>
+                <th class="col-fungsi" style="width:75px;">Fungsi</th>
                 <th class="col-nama">Nama</th>
-                <th class="col-num" style="width:32px;">Jan</th>
-                <th class="col-num" style="width:32px;">Feb</th>
-                <th class="col-num" style="width:32px;">Mar</th>
-                <th class="col-num" style="width:32px;">Apr</th>
-                <th class="col-num" style="width:32px;">Mei</th>
-                <th class="col-num" style="width:32px;">Jun</th>
-                <th class="col-num" style="width:32px;">Jul</th>
-                <th class="col-num" style="width:32px;">Agu</th>
-                <th class="col-num" style="width:32px;">Sep</th>
-                <th class="col-num" style="width:32px;">Okt</th>
-                <th class="col-num" style="width:32px;">Nov</th>
-                <th class="col-num" style="width:32px;">Des</th>
-                <th class="col-num" style="width:38px;background:#5a7018;">Total</th>
+                <th class="col-nopek" style="width:55px;text-align:center;">NOPEK</th>
+                <th class="col-num" style="width:28px;">Jan</th>
+                <th class="col-num" style="width:28px;">Feb</th>
+                <th class="col-num" style="width:28px;">Mar</th>
+                <th class="col-num" style="width:28px;">Apr</th>
+                <th class="col-num" style="width:28px;">Mei</th>
+                <th class="col-num" style="width:28px;">Jun</th>
+                <th class="col-num" style="width:28px;">Jul</th>
+                <th class="col-num" style="width:28px;">Agu</th>
+                <th class="col-num" style="width:28px;">Sep</th>
+                <th class="col-num" style="width:28px;">Okt</th>
+                <th class="col-num" style="width:28px;">Nov</th>
+                <th class="col-num" style="width:28px;">Des</th>
+                <th class="col-num" style="width:34px;background:#5a7018;">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -242,6 +243,7 @@
                     <td class="col-no">{{ $index + 1 }}</td>
                     <td class="col-fungsi"><span class="badge-fungsi">Business Support</span></td>
                     <td class="col-nama">{{ $row['pelapor'] }}</td>
+                    <td class="col-nopek" style="text-align:center;font-family:monospace;font-size:7px;">{{ $row['nopek'] ?? '-' }}</td>
                     @for($m = 1; $m <= 12; $m++)
                         @php $v = $row['monthly'][$m] ?? 0; @endphp
                         <td class="col-num {{ $v === 0 ? 'zero' : '' }}">{{ $v > 0 ? number_format($v) : '0' }}</td>
@@ -252,7 +254,7 @@
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="3" class="total-label">Total Keseluruhan</td>
+                <td colspan="4" class="total-label">Total Keseluruhan</td>
                 @for($m = 1; $m <= 12; $m++)
                     <td class="total-val">{{ number_format($rekapPelapor['monthly_totals'][$m] ?? 0) }}</td>
                 @endfor

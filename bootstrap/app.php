@@ -14,6 +14,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
         ]);
+
+        $middleware->appendToGroup('web', \App\Http\Middleware\PreventBackHistoryCache::class);
+
+        $middleware->redirectTo(
+            guests: '/login',
+            users: function ($request) {
+                $user = $request->user();
+                if ($user && ($user->role === 'Admin Function' || $user->role === 'Manager Function')) {
+                    return route('dashboard.fungsi', $user->fungsi);
+                }
+                return route('dashboard');
+            }
+        );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

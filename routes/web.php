@@ -13,14 +13,17 @@ use App\Http\Controllers\MasterManpowerController;
 use App\Http\Controllers\MasterFunctionMappingController;
 use App\Http\Controllers\MasterPersonilController;
 use App\Http\Controllers\UnreportedPersonilController;
+use App\Http\Controllers\PelaporSipekaMappingController;
 
 // -----------------------------------------------------------------
 // Guest Routes — Public & Auth
 // -----------------------------------------------------------------
 Route::view('/', 'welcome')->name('home');
 
-Route::view('/login', 'auth.login')->name('login');
-Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+Route::middleware('guest')->group(function () {
+    Route::view('/login', 'auth.login')->name('login');
+    Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+});
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // -----------------------------------------------------------------
@@ -33,16 +36,27 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/executive-summary/pdf', [DashboardController::class, 'exportExecutiveSummaryPdf'])
          ->name('dashboard.executive-summary.pdf');
 
-    // Export PDF Rekap Pelapor Business Support
+    // Export PDF Rekap Pelapor Business Support (backward compatibility)
     // Route ini HARUS didefinisikan SEBELUM route fungsi wildcard agar tidak tertangkap sebagai {nama_fungsi}
     Route::get('/dashboard/fungsi/business-support/rekap-pelapor/pdf', [DashboardFunctionController::class, 'exportBusinessSupportReporterPdf'])
          ->name('dashboard.business-support.rekap-pelapor.pdf');
 
-    // Halaman Rekap Pelapor Business Support — halaman tersendiri
-    // Accessible: Admin HSSE, Manager HSSE, Admin Function BS, Manager Function BS
-    // Otorisasi detail ditangani di controller
+    // Halaman Rekap Pelapor Business Support (backward compatibility)
     Route::get('/dashboard/fungsi/business-support/rekap-pelapor', [DashboardFunctionController::class, 'rekapPelapor'])
+         ->defaults('nama_fungsi', 'Business Support')
          ->name('dashboard.business-support.rekap-pelapor');
+
+    // Export PDF Rekap Pelapor per Fungsi (Operation, Maintenance, HSSE, Business Support)
+    Route::get('/dashboard/fungsi/{nama_fungsi}/rekap-pelapor/pdf', [DashboardFunctionController::class, 'exportReporterPdf'])
+         ->name('dashboard.fungsi.rekap-pelapor.pdf');
+
+    // Halaman Rekap Pelapor per Fungsi
+    Route::get('/dashboard/fungsi/{nama_fungsi}/rekap-pelapor', [DashboardFunctionController::class, 'rekapPelapor'])
+         ->name('dashboard.fungsi.rekap-pelapor');
+
+    // Short route untuk Rekap Pelapor fungsi user yang sedang login
+    Route::get('/dashboard/rekap-pelapor', [DashboardFunctionController::class, 'rekapPelapor'])
+         ->name('dashboard.rekap-pelapor');
 
     // Dashboard Function — semua role bisa akses (otorisasi di controller)
     Route::get('/dashboard/fungsi/{nama_fungsi?}', [DashboardFunctionController::class, 'index'])
@@ -130,5 +144,20 @@ Route::middleware('auth')->group(function () {
              ->name('master.personil.toggle-status');
         Route::delete('/master/personil/{personil}', [MasterPersonilController::class, 'destroy'])
              ->name('master.personil.destroy');
+
+        // -----------------------------------------------------------------
+        // Mapping Pelapor SIPEKA → Master Personil (manual) — hanya Admin HSSE
+        // Hanya dipakai oleh Daftar Belum Melapor; TIDAK memengaruhi grafik Keterlibatan.
+        // -----------------------------------------------------------------
+        Route::get('/master/pelapor-mapping', [PelaporSipekaMappingController::class, 'index'])
+             ->name('master.pelapor-mapping.index');
+        Route::get('/master/pelapor-mapping/personils', [PelaporSipekaMappingController::class, 'searchPersonil'])
+             ->name('master.pelapor-mapping.personils');
+        Route::post('/master/pelapor-mapping', [PelaporSipekaMappingController::class, 'store'])
+             ->name('master.pelapor-mapping.store');
+        Route::put('/master/pelapor-mapping/{mapping}', [PelaporSipekaMappingController::class, 'update'])
+             ->name('master.pelapor-mapping.update');
+        Route::delete('/master/pelapor-mapping/{mapping}', [PelaporSipekaMappingController::class, 'destroy'])
+             ->name('master.pelapor-mapping.destroy');
     });
 });

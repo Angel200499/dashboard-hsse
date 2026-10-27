@@ -18,12 +18,22 @@ use Illuminate\Support\Collection;
  *  - Seorang personil "belum pernah melapor" jika namanya tidak pernah muncul.
  *  - Matching memakai nama ternormalisasi (trim + spasi ganda dirapikan + lowercase).
  *    Tidak ada fuzzy matching ("Aji B. Kurniawan" ≠ "Aji Bayu Kurniawan").
+ *  - Urutan resolusi pelapor (lihat PelaporResolverService): mapping manual → exact
+ *    normalized match → belum terpetakan. Mapping hanya memengaruhi daftar ini,
+ *    TIDAK memengaruhi grafik Keterlibatan.
  *
  * Performa: seluruh nama pelapor SIPEKA diambil dalam SATU query (DISTINCT) dan dibuat
  * menjadi lookup set di memory — tidak ada N personil → N query.
  */
 class UnreportedPersonilService
 {
+    /** Nilai scope khusus: seluruh 4 fungsi utama (Dashboard Global). GM TIDAK termasuk. */
+    public const SCOPE_ALL = 'all';
+
+    public function __construct(
+        protected PelaporResolverService $resolver
+    ) {}
+
     /**
      * Normalisasi nama untuk pencocokan aman:
      * trim, rapikan whitespace berulang menjadi satu spasi, lowercase.
@@ -65,14 +75,23 @@ class UnreportedPersonilService
      */
     protected function resolve(string $fungsi): array
     {
-        $reportedLookup = $this->getReporterLookup();
+        // Resolusi pelapor: Manual Mapping → exact normalized match → belum terpetakan
+        $resolution = $this->resolver->resolve();
+        $reportedIds = $resolution['reported_ids'];
 
-        $active = MasterPersonil::active()->byFungsi($fungsi)->get()
+        $query = MasterPersonil::active();
+        if ($fungsi === self::SCOPE_ALL) {
+            $query->whereIn('fungsi', MasterPersonil::FUNGSI_LIST); // 4 fungsi utama; GM bukan bagian
+        } else {
+            $query->byFungsi($fungsi);
+        }
+
+        $active = $query->get()
             ->sortBy(fn (MasterPersonil $p) => self::normalizeName($p->nama))
             ->values();
 
         $unreported = $active
-            ->reject(fn (MasterPersonil $p) => isset($reportedLookup[self::normalizeName($p->nama)]))
+            ->reject(fn (MasterPersonil $p) => isset($reportedIds[$p->id]))
             ->values();
 
         return [
@@ -81,7 +100,7 @@ class UnreportedPersonilService
                 'total_active'     => $active->count(),
                 'total_unreported' => $unreported->count(),
                 'total_reported'   => $active->count() - $unreported->count(),
-                'unmatched_sipeka' => $this->getUnmatchedSipekaReporters($reportedLookup),
+                'unmatched_sipeka' => $this->getUnmatchedSipekaReporters($resolution['unresolved'], $fungsi),
             ],
         ];
     }
@@ -155,33 +174,33 @@ class UnreportedPersonilService
     }
 
     /**
-     * Nama pelapor SIPEKA yang tidak ditemukan pada Master Personil MANAPUN
-     * (semua fungsi & status). Tidak otomatis dimasukkan ke Master Personil —
-     * hanya ditampilkan agar admin tahu ada selisih antara data personil & SIPEKA.
+     * Pelapor SIPEKA yang belum terpetakan: tidak ada mapping manual DAN tidak
+     * exact-match dengan Master Personil mana pun. Tidak otomatis dimasukkan ke
+     * Master Personil — ditampilkan transparan agar admin dapat melakukan mapping.
      *
-     * @param  array<string, string> $reportedLookup
-     * @return array<int, string>
+     * Pada scope fungsi tertentu hanya pelapor dengan fungsi SIPEKA tsb yang tampil;
+     * pada scope 'all' seluruhnya tampil.
+     *
+     * @param  array<string, array> $unresolved  hasil PelaporResolverService::resolve()['unresolved']
+     * @return array<int, array{nama:string, fungsi:?string, jumlah:int}>
      */
-    protected function getUnmatchedSipekaReporters(array $reportedLookup): array
+    protected function getUnmatchedSipekaReporters(array $unresolved, string $fungsi): array
     {
-        if (empty($reportedLookup)) {
-            return [];
-        }
-
-        $masterNames = MasterPersonil::query()->pluck('nama')
-            ->mapWithKeys(fn ($n) => [self::normalizeName($n) => true])
-            ->all();
-
-        $unmatched = [];
-        foreach ($reportedLookup as $key => $display) {
-            if (!isset($masterNames[$key])) {
-                $unmatched[] = $display;
+        $out = [];
+        foreach ($unresolved as $stat) {
+            if ($fungsi !== self::SCOPE_ALL && $stat['fungsi'] !== $fungsi) {
+                continue;
             }
+            $out[] = [
+                'nama'   => $stat['nama'],
+                'fungsi' => $stat['fungsi'] ?? $stat['fungsi_raw'],
+                'jumlah' => $stat['count'],
+            ];
         }
 
-        sort($unmatched, SORT_NATURAL | SORT_FLAG_CASE);
+        usort($out, fn ($a, $b) => strnatcasecmp($a['nama'], $b['nama']));
 
-        return $unmatched;
+        return $out;
     }
 
     /**

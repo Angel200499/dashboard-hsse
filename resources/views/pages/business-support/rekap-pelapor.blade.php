@@ -210,6 +210,7 @@
                             <th class="px-4 py-3 font-semibold text-center w-12">No</th>
                             <th class="px-4 py-3 font-semibold text-left" style="min-width:120px;">Fungsi</th>
                             <th class="px-4 py-3 font-semibold text-left" style="min-width:180px;">Nama</th>
+                            <th class="px-3 py-3 font-semibold text-center" style="min-width:90px;">NOPEK</th>
                             @foreach(['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'] as $bln)
                                 <th class="px-2 py-3 font-semibold text-right" style="min-width:44px;">{{ $bln }}</th>
                             @endforeach
@@ -226,6 +227,13 @@
                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold" style="background:#f3f9e0;color:#4a6a0a;">Business Support</span>
                                 </td>
                                 <td class="px-4 py-3 font-medium text-slate-800">{{ $row['pelapor'] }}</td>
+                                <td class="px-3 py-3 text-center">
+                                    @if(!empty($row['nopek']) && $row['nopek'] !== '-')
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">{{ $row['nopek'] }}</span>
+                                    @else
+                                        <span class="text-slate-400 text-xs">-</span>
+                                    @endif
+                                </td>
                                 @for($m = 1; $m <= 12; $m++)
                                     @php $val = $row['monthly'][$m] ?? 0; @endphp
                                     <td class="px-2 py-3 text-right {{ $val > 0 ? 'font-semibold text-slate-800' : 'text-slate-300' }}">{{ $val > 0 ? number_format($val) : '0' }}</td>
@@ -237,7 +245,7 @@
                     <tfoot>
                         <tr class="bg-slate-800 text-white">
                             <td class="px-4 py-3 text-center"></td>
-                            <td class="px-4 py-3 font-semibold text-xs uppercase tracking-wide" colspan="2">Total</td>
+                            <td class="px-4 py-3 font-semibold text-xs uppercase tracking-wide" colspan="3">Total</td>
                             @for($m = 1; $m <= 12; $m++)
                                 <td class="px-2 py-3 text-right font-bold">{{ number_format($rekapPelapor['monthly_totals'][$m] ?? 0) }}</td>
                             @endfor

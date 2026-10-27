@@ -71,6 +71,14 @@ class MasterPersonil extends Model
     }
 
 
+    /**
+     * Mapping manual nama pelapor SIPEKA yang menunjuk ke personil ini.
+     */
+    public function sipekaMappings()
+    {
+        return $this->hasMany(PelaporSipekaMapping::class, 'master_personil_id');
+    }
+
     // -----------------------------------------------------------------
     // QUERY SCOPES
     // -----------------------------------------------------------------

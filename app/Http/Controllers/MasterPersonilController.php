@@ -130,6 +130,10 @@ class MasterPersonilController extends Controller
             return back()->with('error', "Personil '{$personil->nama}' tidak dapat dihapus permanen karena tercatat memiliki {$count} riwayat laporan observasi di data SIPEKA. Silakan ubah statusnya menjadi 'Non-Aktif' untuk menjaga integritas data.");
         }
 
+        if ($personil->sipekaMappings()->exists()) {
+            return back()->with('error', "Personil '{$personil->nama}' tidak dapat dihapus karena menjadi target Mapping Pelapor SIPEKA. Hapus mapping terkait terlebih dahulu atau ubah statusnya menjadi 'Non-Aktif'.");
+        }
+
         $nama = $personil->nama;
         $personil->delete();
 

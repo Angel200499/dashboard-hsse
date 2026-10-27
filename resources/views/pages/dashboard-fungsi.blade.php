@@ -36,7 +36,7 @@
                 </select>
 
                 {{-- ================================================
-                     FILTER TAHUN + BULAN (untuk KPI, Chart, Reporting Rate)
+                     FILTER TAHUN (KPI, Monitoring Temuan, & Chart)
                 ================================================ --}}
                 @php
                     $bulanNamaList = [
@@ -45,16 +45,22 @@
                         9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
                     ];
                     $tahunList = range(now()->year + 1, 2020);
-
-                    // Dropdown bulan khusus Reporting Rate — hanya tampilkan bulan yang
-                    // benar-benar memiliki data SIPEKA pada tahun yang dipilih.
-                    // $maxBulanSipeka dikirim dari DashboardFunctionController.
-                    $rrBulanList = ($maxBulanSipeka ?? null)
-                        ? array_filter($bulanNamaList, fn($num) => $num <= $maxBulanSipeka, ARRAY_FILTER_USE_KEY)
-                        : $bulanNamaList;
                 @endphp
 
-                <select name="year" onchange="document.getElementById('month-filter').value=''; this.form.submit()"
+                @if(request()->has('ko_year'))
+                    <input type="hidden" name="ko_year" value="{{ request('ko_year') }}">
+                @endif
+                @if(request()->has('ko_month'))
+                    <input type="hidden" name="ko_month" value="{{ request('ko_month') }}">
+                @endif
+                @if(request()->has('rr_year'))
+                    <input type="hidden" name="rr_year" value="{{ request('rr_year') }}">
+                @endif
+                @if(request()->has('rr_month'))
+                    <input type="hidden" name="rr_month" value="{{ request('rr_month') }}">
+                @endif
+
+                <select name="year" onchange="this.form.submit()"
                     class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
                     <option value="">Semua Tahun</option>
                     @foreach($tahunList as $yr)
@@ -62,18 +68,11 @@
                     @endforeach
                 </select>
 
-                <select name="month" id="month-filter" onchange="this.form.submit()"
-                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm {{ !$selectedYear ? 'opacity-50' : '' }}"
-                    {{ !$selectedYear ? 'disabled' : '' }}>
-                    <option value="">Semua Bulan</option>
-                    {{-- $rrBulanList hanya berisi bulan yang memiliki data SIPEKA aktual --}}
-                    @foreach($rrBulanList as $num => $nama)
-                        <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
-                    @endforeach
-                </select>
-
-                @if($selectedYear || $selectedMonth ?? false)
-                    <a href="{{ request()->url() }}" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter</a>
+                @if($selectedYear || request('search') || request('status_filter') || request('date_filter'))
+                    @php
+                        $resetHeaderQuery = request()->only(['rr_year', 'rr_month', 'ko_year', 'ko_month']);
+                    @endphp
+                    <a href="{{ request()->url() }}{{ !empty($resetHeaderQuery) ? '?' . http_build_query($resetHeaderQuery) : '' }}" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter</a>
                 @endif
             </form>
 
@@ -136,7 +135,7 @@
         
         <!-- Chart 1: Pelaporan per Fungsi (Pie) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">1. Jumlah Pelaporan per Fungsi</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-4">1. Jumlah Pelaporan per Fungsi</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart1"></canvas>
             </div>
@@ -145,76 +144,249 @@
         <!-- Chart 2: Reporting Rate per Fungsi (Horizontal Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
             @php
-                $rrMode   = $charts['reporting']['mode'] ?? 'distribusi';
-                $rrLabel  = $rrMode === 'manpower_rasio'
-                    ? '2. Reporting Rate (' . ($charts['reporting']['periode_label'] ?? '') . ')'
-                    : '2. Reporting Rate per Fungsi';
-                $rrData   = $charts['reporting']['data'] ?? [];
-                $hasNull  = in_array(null, $rrData, true);
+                $rrMode  = $charts['reporting']['mode'] ?? 'distribusi';
+                $rrData  = $charts['reporting']['data'] ?? [];
+                $hasNull = in_array(null, $rrData, true);
+
+                if ($rrMode === 'manpower_rasio') {
+                    if ($rrMonth && isset($bulanNamaList[$rrMonth])) {
+                        $rrPeriodeText = $bulanNamaList[$rrMonth] . ' ' . $rrYear;
+                    } else {
+                        $rrPeriodeText = $charts['reporting']['periode_label'] ?? '';
+                    }
+                    $rrLabel = '2. Reporting Rate per Fungsi (' . $rrPeriodeText . ')';
+                } else {
+                    $rrLabel = '2. Reporting Rate per Fungsi';
+                }
             @endphp
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-base font-bold text-slate-800">{{ $rrLabel }}</h3>
-                @if($rrMode === 'manpower_rasio')
-                    <span class="text-xs font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">temuan YTD ÷ (manpower × bulan) × 100</span>
-                @endif
+
+            {{-- Header: Judul + Filter Mandiri In-Card --}}
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+                <div>
+                    <h3 class="text-[22px] font-bold text-slate-800">{{ $rrLabel }}</h3>
+                    <p class="text-xs text-slate-400 mt-0.5 font-mono">
+                        @if($rrMode === 'manpower_rasio')
+                            temuan YTD ÷ (manpower × bulan)
+                        @else
+                            jumlah pelaporan ÷ manpower tahunan
+                        @endif
+                    </p>
+                </div>
+
+                {{-- Filter Khusus Card 2: Tahun & Bulan Mandiri --}}
+                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+                    {{-- Pertahankan filter existing halaman (search, status, date, sort, dll) --}}
+                    @if(request('search'))
+                        <input type="hidden" name="search" value="{{ request('search') }}">
+                    @endif
+                    @if(request('status_filter'))
+                        <input type="hidden" name="status_filter" value="{{ request('status_filter') }}">
+                    @endif
+                    @if(request('date_filter'))
+                        <input type="hidden" name="date_filter" value="{{ request('date_filter') }}">
+                    @endif
+                    @if(request('year'))
+                        <input type="hidden" name="year" value="{{ request('year') }}">
+                    @endif
+                    @if(request('sort_by'))
+                        <input type="hidden" name="sort_by" value="{{ request('sort_by') }}">
+                    @endif
+                    @if(request('sort_dir'))
+                        <input type="hidden" name="sort_dir" value="{{ request('sort_dir') }}">
+                    @endif
+                    {{-- Pertahankan filter Card 4 (Keterlibatan Observasi) --}}
+                    @if(request('ko_year'))
+                        <input type="hidden" name="ko_year" value="{{ request('ko_year') }}">
+                    @endif
+                    @if(request()->has('ko_month'))
+                        <input type="hidden" name="ko_month" value="{{ request('ko_month') }}">
+                    @endif
+
+                    <select name="rr_year" id="rr-year-filter"
+                        onchange="this.form.submit()"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        @foreach($tahunList as $yr)
+                            <option value="{{ $yr }}" {{ $rrYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                        @endforeach
+                    </select>
+
+                    @php
+                        // Batasi opsi bulan Card 2 berdasarkan bulan SIPEKA terakhir ($rrMaxBulan) untuk tahun dan fungsi terpilih
+                        $card2BulanList = ($rrMaxBulan && $rrYear)
+                            ? array_filter($bulanNamaList, fn($num) => $num <= $rrMaxBulan, ARRAY_FILTER_USE_KEY)
+                            : $bulanNamaList;
+                    @endphp
+                    <select name="rr_month" id="rr-month-filter"
+                        onchange="this.form.submit()"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        <option value="">Semua Bulan</option>
+                        @foreach($card2BulanList as $num => $nama)
+                            <option value="{{ $num }}" {{ ($rrMonth !== null && $rrMonth == $num) ? 'selected' : '' }}>{{ $nama }}</option>
+                        @endforeach
+                    </select>
+
+                    @if(request()->has('rr_year') || request()->has('rr_month'))
+                        @php
+                            $resetRrQuery = request()->except(['rr_year', 'rr_month']);
+                            $resetRrUrl   = request()->url() . ($resetRrQuery ? '?' . http_build_query($resetRrQuery) : '');
+                        @endphp
+                        <a href="{{ $resetRrUrl }}" class="text-xs text-slate-400 hover:text-slate-600 underline whitespace-nowrap">Reset</a>
+                    @endif
+                </form>
             </div>
-            @if($rrMode === 'manpower_rasio' && $hasNull)
-                <p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mb-2">
-                    ⚠️ Data manpower untuk periode ini belum tersedia. Reporting Rate belum dapat dihitung.
-                </p>
-            @elseif($rrMode === 'distribusi' && ($selectedMonth ?? null))
-                <p class="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 mb-2">
-                    ℹ️ Pilih Tahun terlebih dahulu untuk mengaktifkan Reporting Rate berbasis manpower bulanan.
-                </p>
+
+            {{-- Notice State Server-side --}}
+            @if($rrStatus === 'no_sipeka')
+                <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    ⚠️ Data temuan SIPEKA untuk fungsi <strong>{{ $fungsi }}</strong> pada periode <strong>{{ ($rrMonth && isset($bulanNamaList[$rrMonth]) ? $bulanNamaList[$rrMonth] . ' ' : '') . $rrYear }}</strong> belum tersedia.
+                </div>
+            @elseif($rrStatus === 'no_manpower')
+                <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    ⚠️ Data manpower untuk fungsi <strong>{{ $fungsi }}</strong> pada periode <strong>{{ ($rrMonth && isset($bulanNamaList[$rrMonth]) ? $bulanNamaList[$rrMonth] . ' ' : '') . $rrYear }}</strong> belum tersedia. Reporting Rate belum dapat dihitung.
+                </div>
             @endif
-            <div class="flex-1 relative w-full h-full">
-                <canvas id="chart2"></canvas>
-            </div>
+
+            @if($rrStatus === 'no_sipeka' || $rrStatus === 'no_manpower')
+                <div class="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 min-h-[220px]">
+                    <svg class="w-12 h-12 mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <p class="text-sm font-medium text-slate-500">Grafik tidak dapat ditampilkan</p>
+                    <p class="text-xs text-slate-400 mt-1">
+                        @if($rrStatus === 'no_sipeka')
+                            Data temuan SIPEKA untuk periode ini belum tersedia.
+                        @else
+                            Data manpower untuk periode ini belum tersedia.
+                        @endif
+                    </p>
+                </div>
+            @else
+                <div class="flex-1 relative w-full h-full min-h-0">
+                    <canvas id="chart2"></canvas>
+                </div>
+            @endif
         </div>
 
         <!-- Chart 3: Kategori PEKA (Pie) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="min-height:400px">
-            <h3 class="text-base font-bold text-slate-800 mb-4">3. Kategori PEKA</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-4">3. Kategori PEKA</h3>
             <div class="flex-1 relative w-full" style="min-height:300px">
                 <canvas id="chart3"></canvas>
             </div>
             <!-- Statistik Positif / Negatif -->
-            <div id="chart3-stats" class="mt-4 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 space-y-1 hidden">
-                <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                    <span>Jumlah laporan positif <strong id="chart3-positif">-</strong></span>
+            <div id="chart3-stats" class="mt-4 bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 text-base font-bold text-slate-800 space-y-2 hidden">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block flex-shrink-0"></span>
+                    <span class="font-bold">Jumlah laporan positif <strong id="chart3-positif" class="font-bold text-slate-900">-</strong></span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                    <span>Jumlah laporan negatif <strong id="chart3-negatif">-</strong></span>
+                <div class="flex items-center gap-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block flex-shrink-0"></span>
+                    <span class="font-bold">Jumlah laporan negatif <strong id="chart3-negatif" class="font-bold text-slate-900">-</strong></span>
                 </div>
             </div>
         </div>
 
         <!-- Chart 4: Keterlibatan Observasi (Stacked Vertical Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-1 flex flex-wrap items-center gap-2">
-                <span>4. Keterlibatan dalam Observasi</span>
-                <span class="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100" title="Klik bar segmen Belum Melapor untuk melihat daftar personil">
-                    <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
-                    Klik bar untuk daftar personil
-                </span>
-            </h3>
-            <p class="text-xs text-slate-400 mb-3">
-                Rumus: Pelapor unik bulan terpilih &divide; Manpower bulan terpilih &times; 100%
-            </p>
-            <!-- Notice: muncul jika manpower tidak tersedia -->
-            <div id="chart4-notice" class="hidden mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                ⚠️ Data manpower belum tersedia untuk periode ini. Pilih Tahun dan Bulan, lalu pastikan data manpower sudah diinput.
+            {{-- Header: Judul + In-Card Filter --}}
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+                <div>
+                    <h3 class="text-[22px] font-bold text-slate-800 flex flex-wrap items-center gap-2">
+                        <span>4. Keterlibatan dalam Observasi</span>
+                        <span class="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100" title="Klik bar segmen Belum Melapor untuk melihat daftar personil">
+                            <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
+                            Klik bar untuk daftar personil
+                        </span>
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        @if($koStatus === 'ok' && $koMonth && isset($bulanNamaList[$koMonth]))
+                            Rumus: Pelapor unik Jan s/d {{ $bulanNamaList[$koMonth] }} {{ $koYear }} &divide; Manpower {{ $bulanNamaList[$koMonth] }} {{ $koYear }} &times; 100%
+                        @else
+                            Rumus: Pelapor unik Jan s/d bulan terpilih &divide; Manpower bulan terpilih &times; 100%
+                        @endif
+                    </p>
+                </div>
+
+                {{-- Filter Khusus Card 4: Tahun & Bulan Mandiri --}}
+                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+                    {{-- Pertahankan filter existing halaman (search, status, date, dll) --}}
+                    @if(request('search'))
+                        <input type="hidden" name="search" value="{{ request('search') }}">
+                    @endif
+                    @if(request('status_filter'))
+                        <input type="hidden" name="status_filter" value="{{ request('status_filter') }}">
+                    @endif
+                    @if(request('date_filter'))
+                        <input type="hidden" name="date_filter" value="{{ request('date_filter') }}">
+                    @endif
+                    @if(request('year'))
+                        <input type="hidden" name="year" value="{{ request('year') }}">
+                    @endif
+                    @if(request('sort_by'))
+                        <input type="hidden" name="sort_by" value="{{ request('sort_by') }}">
+                    @endif
+                    @if(request('sort_dir'))
+                        <input type="hidden" name="sort_dir" value="{{ request('sort_dir') }}">
+                    @endif
+                    {{-- Pertahankan filter Card 2 (Reporting Rate) --}}
+                    @if(request('rr_year'))
+                        <input type="hidden" name="rr_year" value="{{ request('rr_year') }}">
+                    @endif
+                    @if(request()->has('rr_month'))
+                        <input type="hidden" name="rr_month" value="{{ request('rr_month') }}">
+                    @endif
+
+                    <select name="ko_year" id="ko-year-filter"
+                        onchange="this.form.submit()"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        @foreach($tahunList as $yr)
+                            <option value="{{ $yr }}" {{ $koYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                        @endforeach
+                    </select>
+
+                    <select name="ko_month" id="ko-month-filter"
+                        onchange="this.form.submit()"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        <option value="">Semua Bulan</option>
+                        @foreach($bulanNamaList as $num => $nama)
+                            <option value="{{ $num }}" {{ ($koMonth !== null && $koMonth == $num) ? 'selected' : '' }}>{{ $nama }}</option>
+                        @endforeach
+                    </select>
+
+                    @if(request()->has('ko_year') || request()->has('ko_month'))
+                        @php
+                            $resetQuery = request()->except(['ko_year', 'ko_month']);
+                            $resetUrl = request()->url() . ($resetQuery ? '?' . http_build_query($resetQuery) : '');
+                        @endphp
+                        <a href="{{ $resetUrl }}" class="text-xs text-slate-400 hover:text-slate-600 underline whitespace-nowrap">Reset</a>
+                    @endif
+                </form>
             </div>
-            <div class="flex-1 relative w-full h-full">
+
+            {{-- Notice State Server-side --}}
+            @if($koStatus === 'no_month')
+                <div class="mb-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                    ℹ️ Pilih <strong>Bulan</strong> pada filter di atas grafik untuk menampilkan persentase keterlibatan.
+                </div>
+            @elseif($koStatus === 'no_sipeka')
+                <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    ⚠️ Data temuan SIPEKA untuk periode <strong>{{ ($koMonth && isset($bulanNamaList[$koMonth]) ? $bulanNamaList[$koMonth] . ' ' : '') . $koYear }}</strong> belum tersedia.
+                </div>
+            @elseif($koStatus === 'no_manpower')
+                <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    ⚠️ Data manpower untuk fungsi <strong>{{ $fungsi }}</strong> pada periode <strong>{{ ($koMonth && isset($bulanNamaList[$koMonth]) ? $bulanNamaList[$koMonth] . ' ' : '') . $koYear }}</strong> belum tersedia. Pastikan data manpower sudah diinput di menu <strong>Master Manpower</strong>.
+                </div>
+            @endif
+
+            <div id="chart4-notice" class="hidden mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></div>
+            <div class="flex-1 relative w-full h-full min-h-0">
                 <canvas id="chart4"></canvas>
             </div>
         </div>
 
         <!-- Chart 5: Persentase Temuan per Fungsi (Stacked Vertical Bar) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">5. Rekap Persentase Temuan per Fungsi</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-4">5. Rekap Persentase Temuan per Fungsi</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart5"></canvas>
             </div>
@@ -222,23 +394,23 @@
 
         <!-- Chart 6: Persentase Penindak Lanjut (Donut) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-base font-bold text-slate-800 mb-4">6. Rekap Persentase Penindak Lanjut (By SAP)</h3>
+            <h3 class="text-[22px] font-bold text-slate-800 mb-4">6. Rekap Persentase Penindak Lanjut (By SAP)</h3>
             <div class="flex-1 relative w-full h-full">
                 <canvas id="chart6"></canvas>
             </div>
         </div>
 
         <!-- Chart 7: Unsafe Action (Horizontal Bar) -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="height:340px">
-            <h3 class="text-base font-bold text-slate-800 mb-3">7. Unsafe Action Category</h3>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="height:380px">
+            <h3 class="text-[22px] font-bold text-slate-800 mb-3">7. Unsafe Action Category</h3>
             <div class="flex-1 relative w-full" style="min-height:0">
                 <canvas id="chart7"></canvas>
             </div>
         </div>
 
         <!-- Chart 8: Unsafe Condition (Horizontal Bar) -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="height:600px">
-            <h3 class="text-base font-bold text-slate-800 mb-3">8. Unsafe Condition Category</h3>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col" style="height:680px">
+            <h3 class="text-[22px] font-bold text-slate-800 mb-3">8. Unsafe Condition Category</h3>
             <div class="flex-1 relative w-full" style="min-height:0">
                 <canvas id="chart8"></canvas>
             </div>
@@ -257,11 +429,13 @@
             <table class="w-full text-sm text-left text-slate-500 whitespace-nowrap">
                 <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm">
                     @php
-                        function sortUrl($column) {
-                            $currentSortBy = request('sort_by');
-                            $currentSortDir = request('sort_dir', 'asc');
-                            $newDir = ($currentSortBy === $column && $currentSortDir === 'asc') ? 'desc' : 'asc';
-                            return request()->fullUrlWithQuery(['sort_by' => $column, 'sort_dir' => $newDir]);
+                        if (!function_exists('sortUrl')) {
+                            function sortUrl($column) {
+                                $currentSortBy = request('sort_by');
+                                $currentSortDir = request('sort_dir', 'asc');
+                                $newDir = ($currentSortBy === $column && $currentSortDir === 'asc') ? 'desc' : 'asc';
+                                return request()->fullUrlWithQuery(['sort_by' => $column, 'sort_dir' => $newDir]);
+                            }
                         }
                     @endphp
                     <tr>
@@ -540,12 +714,26 @@
             options: { 
                 ...commonOptions, 
                 plugins: { 
-                    legend: { position: 'bottom' },
+                    legend: { 
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                size: 16,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            color: '#1e293b',
+                            padding: 16,
+                            boxWidth: 16,
+                            boxHeight: 16
+                        }
+                    },
                     datalabels: {
-                        color: '#333',
+                        color: '#1e293b',
                         font: {
-                            weight: 'normal',
-                            size: 11
+                            weight: 'bold',
+                            size: 16,
+                            family: "'Inter', sans-serif"
                         },
                         formatter: (value) => {
                             if (value === 0 || chart1Total === 0) return null;
@@ -554,6 +742,17 @@
                         }
                     },
                     tooltip: {
+                        titleFont: {
+                            size: 15,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 14,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 12,
                         callbacks: {
                             label: function(ctx) {
                                 const val = ctx.raw;
@@ -586,19 +785,60 @@
         };
         const rrBgColors = rrLabels.map(l => rrColorMap[l] || '#9CA3AF');
 
-        if (rrLabels.length > 0) {
-            new Chart(document.getElementById('chart2'), {
+        const chart2El = document.getElementById('chart2');
+        if (chart2El && rrLabels.length > 0) {
+            new Chart(chart2El, {
                 type: 'bar',
                 data: { 
                     labels: rrLabels, 
                     datasets: [{ data: rrValues, backgroundColor: rrBgColors, borderRadius: 4 }] 
                 },
+                plugins: [
+                    {
+                        id: 'rrValueLabels',
+                        afterDatasetsDraw(chartInstance) {
+                            const ctx = chartInstance.ctx;
+                            ctx.save();
+                            ctx.font = "bold 14px 'Inter', sans-serif";
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillStyle = '#1e293b';
+
+                            chartInstance.data.datasets.forEach(function (dataset, i) {
+                                const meta = chartInstance.getDatasetMeta(i);
+                                meta.data.forEach(function (bar, index) {
+                                    const data = dataset.data[index];
+                                    if (data !== null && data !== undefined) {
+                                        ctx.fillText(data, bar.x + 8, bar.y);
+                                    }
+                                });
+                            });
+                            ctx.restore();
+                        }
+                    }
+                ],
                 options: { 
                     ...commonOptions, 
                     indexAxis: 'y', 
+                    layout: {
+                        padding: {
+                            right: 60
+                        }
+                    },
                     plugins: { 
                         legend: { display: false },
                         tooltip: {
+                            titleFont: {
+                                size: 15,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            bodyFont: {
+                                size: 14,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            padding: 12,
                             callbacks: {
                                 label: (ctx) => {
                                     const val = ctx.raw;
@@ -610,26 +850,21 @@
                         }
                     },
                     scales: { 
-                        x: { beginAtZero: true, grid: { display: false } },
-                        y: { grid: { display: false } }
-                    },
-                    animation: {
-                        onComplete: function() {
-                            var chartInstance = this;
-                            var ctx = chartInstance.ctx;
-                            ctx.font = Chart.helpers.fontString(12, 'normal', Chart.defaults.font.family);
-                            ctx.textAlign = 'left';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillStyle = '#333';
-
-                            this.data.datasets.forEach(function (dataset, i) {
-                                var meta = chartInstance.getDatasetMeta(i);
-                                meta.data.forEach(function (bar, index) {
-                                    var data = dataset.data[index];
-                                    var label = rrMode === 'manpower_rasio' ? data : data;
-                                    ctx.fillText(label, bar.x + 5, bar.y);
-                                });
-                            });
+                        x: { 
+                            beginAtZero: true, 
+                            grace: '15%',
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
+                            }
+                        },
+                        y: { 
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
+                            }
                         }
                     }
                 }
@@ -656,24 +891,51 @@
             options: { 
                 ...commonOptions, 
                 plugins: { 
-                    legend: { position: 'right' },
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            font: {
+                                size: 16,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            color: '#1e293b',
+                            padding: 16,
+                            boxWidth: 16,
+                            boxHeight: 16
+                        }
+                    },
                     datalabels: {
-                        color: '#333',
+                        color: '#1e293b',
                         font: {
-                            weight: 'normal',
-                            size: 11
+                            weight: 'bold',
+                            size: 16,
+                            family: "'Inter', sans-serif"
                         },
                         formatter: (value) => {
                             if (value === 0 || chart3Total === 0) return null;
-                            const pct = Math.round((value / chart3Total) * 100);
+                            const pct = ((value / chart3Total) * 100).toFixed(2).replace('.', ',');
                             return pct + '%';
                         }
                     },
                     tooltip: {
+                        titleFont: {
+                            size: 15,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 14,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 12,
                         callbacks: {
                             label: function(ctx) {
                                 const val = ctx.raw;
-                                const pct = chart3Total > 0 ? Math.round((val / chart3Total) * 100) : 0;
+                                const pct = chart3Total > 0
+                                    ? ((val / chart3Total) * 100).toFixed(2).replace('.', ',')
+                                    : '0,00';
                                 return [
                                     ' ' + val.toLocaleString('id-ID') + ' Pelaporan',
                                     ' ' + pct + '%'
@@ -694,31 +956,36 @@
             const fmt = (n) => (chart3Total > 0 ? (n / chart3Total * 100).toFixed(2) : '0.00').replace('.', ',');
             const statsEl = document.getElementById('chart3-stats');
             if (statsEl) {
-                document.getElementById('chart3-positif').textContent = fmt(positifTotal) + ' %';
-                document.getElementById('chart3-negatif').textContent  = fmt(negatifTotal)  + ' %';
+                document.getElementById('chart3-positif').textContent = fmt(positifTotal) + '%';
+                document.getElementById('chart3-negatif').textContent  = fmt(negatifTotal)  + '%';
                 statsEl.classList.remove('hidden');
             }
         }
 
-        // 4. Stacked Vertical Bar - Keterlibatan
-        // Data berupa [fungsi => float|null]. null = manpower tidak tersedia.
-        const invRaw    = charts.keterlibatan;
-        const invLabels = Object.keys(invRaw);
-        const invData   = invLabels.map(k => invRaw[k] !== null ? Math.min(invRaw[k], 100) : 0);
-        const remData   = invLabels.map(k => invRaw[k] !== null ? Math.max(100 - invRaw[k], 0) : 100);
+        // ================================================================
+        // 4. Stacked Vertical Bar - Keterlibatan Observasi (%)
+        // FIX: Chart SELALU dirender selama ada minimal 1 fungsi.
+        //   - Fungsi null / not ok → placeholder abu-abu (data belum tersedia / N/A)
+        //   - Fungsi float + ok   → bar normal (Keterlibatan + Sisa 100%)
+        // ================================================================
+        (function() {
+            const invRaw    = charts.keterlibatan || {};
+            const invLabels = Object.keys(invRaw);
 
-        const allNull   = invLabels.every(k => invRaw[k] === null);
-        const someNull  = invLabels.some(k => invRaw[k] === null);
-        const notice4   = document.getElementById('chart4-notice');
+            if (invLabels.length === 0) return;
 
-        if (allNull) {
-            if (notice4) notice4.classList.remove('hidden');
-        } else {
-            if (notice4 && someNull) {
-                notice4.textContent = '⚠️ Beberapa fungsi tidak memiliki data manpower untuk periode ini.';
-                notice4.classList.remove('hidden');
-            }
+            const koStatus = @json($koStatus ?? 'ok');
+            const isOk     = koStatus === 'ok';
 
+            // ---- Siapkan data chart -----------------------------------------
+            const invData = invLabels.map(k => (isOk && invRaw[k] !== null) ? Math.min(invRaw[k], 100) : 0);
+            const remData = invLabels.map(k => (isOk && invRaw[k] !== null) ? Math.max(100 - Math.min(invRaw[k], 100), 0) : 100);
+
+            // Warna: fungsi dengan data → normal; fungsi null / error → abu-abu
+            const ketBgColors = invLabels.map(k => (isOk && invRaw[k] !== null) ? '#ED7D31' : 'transparent');
+            const sisBgColors = invLabels.map(k => (isOk && invRaw[k] !== null) ? '#5AA2D7'  : '#E2E8F0');
+
+            // ---- Render Chart ------------------------------------------------
             new Chart(document.getElementById('chart4'), {
                 type: 'bar',
                 plugins: [ChartDataLabels],
@@ -728,29 +995,39 @@
                         {
                             label: 'Keterlibatan',
                             data: invData,
-                            backgroundColor: '#ED7D31',
+                            backgroundColor: ketBgColors,
                             datalabels: {
                                 display: (ctx) => {
                                     const key = invLabels[ctx.dataIndex];
-                                    return invRaw[key] !== null && invData[ctx.dataIndex] > 0;
+                                    return isOk && invRaw[key] !== null && invData[ctx.dataIndex] > 0;
                                 },
                                 color: '#fff',
                                 anchor: 'center',
                                 align: 'center',
-                                font: { weight: 'bold', size: 12 },
+                                font: { weight: 'bold', size: 16, family: "'Inter', sans-serif" },
                                 formatter: (value, ctx) => {
                                     const key = invLabels[ctx.dataIndex];
-                                    if (invRaw[key] === null) return null;
+                                    if (!isOk || invRaw[key] === null) return null;
                                     const val = Math.round(invRaw[key]);
                                     return val > 0 ? val + '%' : null;
                                 }
                             }
                         },
                         {
-                            label: 'Sisa',
+                            label: 'Belum Melapor',
                             data: remData,
-                            backgroundColor: '#5AA2D7',
-                            datalabels: { display: false }
+                            backgroundColor: sisBgColors,
+                            datalabels: {
+                                display: (ctx) => {
+                                    const key = invLabels[ctx.dataIndex];
+                                    return !isOk || invRaw[key] === null;
+                                },
+                                color: '#94A3B8',
+                                anchor: 'center',
+                                align: 'center',
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                formatter: () => 'N/A',
+                            }
                         }
                     ]
                 },
@@ -768,33 +1045,80 @@
                         const key = invLabels[el.index];
                         if (!key) return;
 
-                        // Status "belum pernah melapor" dihitung dari seluruh riwayat SIPEKA,
-                        // sehingga modal tidak memerlukan filter bulan/tahun.
                         if (typeof window.openUnreportedModal === 'function') {
                             window.openUnreportedModal(key);
                         }
-
                     },
                     scales: {
-                        x: { stacked: true, grid: { display: false } },
-                        y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } }
+                        x: { 
+                            stacked: true, 
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            max: 100,
+                            ticks: { 
+                                callback: v => v + '%',
+                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b'
+                            }
+                        }
                     },
                     plugins: {
-                        legend: { position: 'bottom' },
+                        legend: { 
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 16, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b',
+                                padding: 16,
+                                boxWidth: 16,
+                                boxHeight: 16
+                            }
+                        },
                         tooltip: {
+                            titleFont: {
+                                size: 15,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            bodyFont: {
+                                size: 14,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            padding: 12,
                             callbacks: {
                                 label: function(ctx) {
                                     const key = invLabels[ctx.dataIndex];
-                                    if (invRaw[key] === null) return ' Data manpower belum tersedia';
+                                    if (!isOk || invRaw[key] === null) {
+                                        if (ctx.datasetIndex === 1) {
+                                            if (koStatus === 'no_sipeka') {
+                                                return ' Data temuan SIPEKA belum tersedia';
+                                            } else if (koStatus === 'no_manpower') {
+                                                return ' Data manpower belum tersedia';
+                                            } else if (koStatus === 'no_month') {
+                                                return ' Pilih Bulan untuk menampilkan persentase';
+                                            }
+                                            return ' Data belum tersedia';
+                                        }
+                                        return null;
+                                    }
                                     if (ctx.datasetIndex === 1) return null;
-                                    return ` Keterlibatan: ${invRaw[key].toLocaleString('id-ID', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%`;
+                                    return ` Keterlibatan: ${invRaw[key].toLocaleString('id-ID', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}%`;
                                 }
                             }
                         }
                     }
                 }
             });
-        }
+        })();
 
         // 5. Stacked Vertical Bar - Rekap % Temuan Fungsi
         const ptLabels = getLabels(charts.persentase_fungsi);
@@ -819,7 +1143,7 @@
                             color: '#fff',
                             anchor: 'center',
                             align: 'center',
-                            font: { weight: 'bold', size: 12 },
+                            font: { weight: 'bold', size: 16, family: "'Inter', sans-serif" },
                             formatter: (value) => {
                                 const val = Math.round(value);
                                 return val > 0 ? val + '%' : null;
@@ -839,12 +1163,47 @@
             options: { 
                 ...commonOptions, 
                 scales: { 
-                    x: { stacked: true, grid: { display: false } }, 
-                    y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } } 
+                    x: { 
+                        stacked: true, 
+                        grid: { display: false },
+                        ticks: {
+                            font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                            color: '#1e293b'
+                        }
+                    }, 
+                    y: { 
+                        stacked: true, 
+                        max: 100, 
+                        ticks: { 
+                            callback: v => v + '%',
+                            font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                            color: '#1e293b'
+                        } 
+                    } 
                 },
                 plugins: {
-                    legend: { position: 'bottom' },
+                    legend: { 
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 16, weight: 'bold', family: "'Inter', sans-serif" },
+                            color: '#1e293b',
+                            padding: 16,
+                            boxWidth: 16,
+                            boxHeight: 16
+                        }
+                    },
                     tooltip: {
+                        titleFont: {
+                            size: 15,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 14,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 12,
                         callbacks: {
                             label: function(ctx) {
                                 const val = ctx.raw;
@@ -866,39 +1225,154 @@
                     backgroundColor: getBgColors(getLabels(charts.tindak_lanjut)) 
                 }] 
             },
-            options: { ...commonOptions, plugins: { legend: { position: 'right' } } }
+            options: { 
+                ...commonOptions, 
+                plugins: { 
+                    legend: { 
+                        position: 'right',
+                        labels: {
+                            font: { size: 16, weight: 'bold', family: "'Inter', sans-serif" },
+                            color: '#1e293b',
+                            padding: 16,
+                            boxWidth: 16,
+                            boxHeight: 16
+                        }
+                    },
+                    tooltip: {
+                        titleFont: {
+                            size: 15,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        bodyFont: {
+                            size: 14,
+                            weight: 'bold',
+                            family: "'Inter', sans-serif"
+                        },
+                        padding: 12
+                    }
+                } 
+            }
         });
 
-        // Helper for Horizontal Bar charts with Data Labels (Percentages)
+        // Helper to format long bilingual category labels into controlled multi-line arrays
+        const formatBilingualLabel = (label, maxChars = 38) => {
+            if (!label) return '';
+            let idPart = label;
+            let enPart = '';
+
+            if (label.includes(' / ')) {
+                const parts = label.split(' / ');
+                idPart = parts[0].trim();
+                enPart = parts.slice(1).join(' / ').trim();
+            } else {
+                // Match slash followed by English translation keywords
+                const match = label.match(/^(.*?)\s*\/\s*(Failure|Using|Improper|Placement|operating|Inadequate|Incorrect|Defective|Mode|material|Restricted|Poor|PPE)(.*)$/i);
+                if (match) {
+                    idPart = match[1].trim();
+                    enPart = (match[2] + match[3]).trim();
+                }
+            }
+
+            const wrap = (str, max) => {
+                if (str.length <= max) return [str];
+                const words = str.split(' ');
+                const lines = [];
+                let curr = '';
+                for (const w of words) {
+                    if ((curr ? curr + ' ' + w : w).length <= max) {
+                        curr = curr ? curr + ' ' + w : w;
+                    } else {
+                        if (curr) lines.push(curr);
+                        curr = w;
+                    }
+                }
+                if (curr) lines.push(curr);
+                return lines;
+            };
+
+            if (!enPart) {
+                return wrap(label, maxChars);
+            }
+
+            return [...wrap(idPart, maxChars), ...wrap(enPart, maxChars)];
+        };
+
+        // Helper for Horizontal Bar charts with Data Labels (Percentages & Counts)
         // Urutan kategori mengikuti backend (PHP array order) — TIDAK di-sort by value.
         const renderHorizontalBar = (ctxId, chartData, color) => {
             // Pertahankan urutan dari backend (PHP array order)
-            let dataArr = Object.entries(chartData.data)
-                .map(([k, v]) => ({ label: k, value: v }));
+            let dataArr = Object.entries(chartData.data || {})
+                .map(([k, v]) => ({
+                    rawLabel: k,
+                    formattedLabel: formatBilingualLabel(k, 38),
+                    value: v
+                }));
             // CATATAN: tidak ada .sort() — urutan ditentukan oleh backend service
             
             const total = chartData.total || 1; // Prevent division by zero
             
             new Chart(document.getElementById(ctxId), {
                 type: 'bar',
+                plugins: [ChartDataLabels],
                 data: { 
-                    labels: dataArr.map(d => d.label), 
+                    labels: dataArr.map(d => d.formattedLabel), 
                     datasets: [{ 
                         data: dataArr.map(d => ((d.value / total) * 100).toFixed(1)), 
                         backgroundColor: color,
                         borderWidth: 0,
                         borderRadius: 4,
-                        barThickness: 18  // fixed agar jarak antar label seragam
+                        barThickness: 16,  // proporsional untuk 2-line label
+                        minBarLength: 6    // bar dengan nilai > 0 selalu terlihat & mudah di-hover
                     }] 
                 },
                 options: { 
                     ...commonOptions, 
                     indexAxis: 'y', 
                     maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            right: 90 // ruang luas agar data label persentase + count utuh dan tidak terpotong
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        axis: 'y',
+                        intersect: false // hover di mana saja sepanjang baris akan memunculkan tooltip
+                    },
                     plugins: { 
                         legend: { display: false },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'right',
+                            offset: 4,
+                            color: '#1e293b',
+                            font: {
+                                weight: 'bold',
+                                size: 12,
+                                family: "'Inter', sans-serif"
+                            },
+                            formatter: function(value, context) {
+                                let rawCount = dataArr[context.dataIndex].value;
+                                return `${value}% (${rawCount})`;
+                            }
+                        },
                         tooltip: {
+                            titleFont: {
+                                size: 14,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            bodyFont: {
+                                size: 13,
+                                family: "'Inter', sans-serif"
+                            },
+                            padding: 12,
                             callbacks: {
+                                title: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    return dataArr[idx].rawLabel || context[0].label;
+                                },
                                 label: function(context) {
                                     let val = context.raw;
                                     let rawCount = dataArr[context.dataIndex].value;
@@ -913,6 +1387,10 @@
                             max: 100,
                             grid: { display: true, color: '#f1f5f9' },
                             ticks: {
+                                maxRotation: 0,
+                                autoSkip: true,
+                                font: { size: 11, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b',
                                 callback: function(value) {
                                     return value + '%';
                                 }
@@ -920,10 +1398,11 @@
                         }, 
                         y: { 
                             grid: { display: false },
-                            afterFit: (scale) => { scale.width = 300; }, // semua bar mulai dari titik yang sama
+                            afterFit: (scale) => { scale.width = 250; }, // ruang proporsional agar label tidak terpotong dan bar leluasa
                             ticks: {
                                 autoSkip: false,
-                                font: { size: 9.5 }  // label bilingual lebih panjang
+                                font: { size: 11, weight: '600', family: "'Inter', sans-serif", lineHeight: 1.25 },
+                                color: '#1e293b'
                             }
                         } 
                     }
@@ -939,3 +1418,4 @@
     });
 </script>
 @endpush
+

@@ -27,7 +27,13 @@ class AuthController extends Controller
             }
 
             $request->session()->regenerate();
-            return redirect()->intended('/dashboard');
+            $request->session()->forget('url.intended');
+
+            if ($user->role === 'Admin Function' || $user->role === 'Manager Function') {
+                return redirect()->route('dashboard.fungsi', $user->fungsi);
+            }
+
+            return redirect()->route('dashboard');
         }
 
         return back()->withErrors([

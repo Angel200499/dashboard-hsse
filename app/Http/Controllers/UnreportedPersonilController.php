@@ -22,7 +22,7 @@ class UnreportedPersonilController extends Controller
     {
         // 1. Validasi input
         $request->validate([
-            'fungsi'   => ['required', 'string', 'in:' . implode(',', MasterPersonil::FUNGSI_LIST)],
+            'fungsi'   => ['required', 'string', 'in:' . implode(',', array_merge(MasterPersonil::FUNGSI_LIST, [UnreportedPersonilService::SCOPE_ALL]))],
             'q'        => ['nullable', 'string', 'max:100'],
             'tipe'     => ['nullable', 'string', 'in:Pekerja,TAD'],
             'page'     => ['nullable', 'integer', 'min:1'],
@@ -71,7 +71,11 @@ class UnreportedPersonilController extends Controller
         return response()->json([
             'success'    => true,
             'meta'       => $result['meta'],
-            'summary'    => $result['summary'],
+            'summary'    => $result['summary'] + [
+                // Tombol Mapping hanya untuk Admin HSSE (route mapping dilindungi middleware role)
+                'can_map'     => (bool) ($user && $user->role === 'Admin HSSE'),
+                'mapping_url' => route('master.pelapor-mapping.index'),
+            ],
             'data'       => $items,
             'pagination' => [
                 'current_page' => $paginator->currentPage(),
@@ -91,7 +95,7 @@ class UnreportedPersonilController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $request->validate([
-            'fungsi' => ['required', 'string', 'in:' . implode(',', MasterPersonil::FUNGSI_LIST)],
+            'fungsi' => ['required', 'string', 'in:' . implode(',', array_merge(MasterPersonil::FUNGSI_LIST, [UnreportedPersonilService::SCOPE_ALL]))],
             'q'      => ['nullable', 'string', 'max:100'],
             'tipe'   => ['nullable', 'string', 'in:Pekerja,TAD'],
         ]);

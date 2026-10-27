@@ -1,0 +1,1517 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\SipekaFinding;
+use App\Models\MasterFunctionMapping;
+use App\Models\MasterManpower;
+use App\Models\MasterPersonil;
+use App\Models\PelaporSipekaMapping;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * DashboardChartService
+ *
+ * Menghasilkan data chart yang identik untuk:
+ *   - Dashboard Global  → getCharts(null, $tahun)
+ *   - Dashboard Function → getCharts($fungsi, $tahun)
+ *
+ * Semua kalkulasi dilakukan di level database (COUNT, GROUP BY, CASE WHEN).
+ * Tidak ada Collection loop, tidak ada hardcoded dummy data.
+ * Blade hanya menerima array PHP siap render — zero logic di Blade.
+ *
+ * Struktur output $charts SELALU sama:
+ * [
+ *   'fungsi'            => [...],   // Chart 1
+ *   'fungsi_info'       => [...],   // Panel info Chart 1
+ *   'reporting_lhd'     => [...],   // Chart 2a — Reporting Rate Area LHD (NEW)
+ *   'reporting'         => [...],   // Chart 2b — Reporting Rate per Fungsi
+ *   'trending'          => [...],   // Chart Trending Temuan (NEW)
+ *   'kategori'          => [...],   // Chart 3
+ *   'keterlibatan'      => [...],   // Chart 4
+ *   'persentase_fungsi' => [...],   // Chart 5
+ *   'tindak_lanjut'     => [...],   // Chart 6
+ *   'unsafe_action'     => [...],   // Chart 7
+ *   'unsafe_condition'  => [...],   // Chart 8
+ * ]
+ *
+ * PENTING — ISOLASI QUERY:
+ * baseQuery() digunakan oleh Chart 1,3,4,6,7,8 dan KPI.
+ * chartReportingRate() dan chartReportingRateLhd() menggunakan
+ * ytdQuery() yang terpisah — jangan mengubah baseQuery() untuk
+ * keperluan Reporting Rate.
+ * chartPersentaseFungsi() menggunakan assetOwnerQuery() yang terpisah
+ * berdasarkan Asset Owner sesuai arahan final mentor.
+ */
+class DashboardChartService
+{
+    /** Daftar fungsi yang valid */
+    private const FUNGSI_LIST = ['Operation', 'Maintenance', 'HSSE', 'Business Support'];
+
+    /**
+     * Ambil semua data chart.
+     *
+     * @param  string|null $fungsi  Jika diisi, semua chart difilter by fungsi.
+     *                              Jika null, mengambil data global.
+     * @param  int|null    $tahun   Jika diisi, filter berdasarkan tahun tanggal temuan.
+     *                              Jika null, semua tahun.
+     * @param  int|null    $bulan   Jika diisi, Reporting Rate menggunakan manpower bulan tersebut
+     *                              dan temuan dihitung YTD (Januari–bulan).
+     *                              Chart lain (Kategori PEKA, Unsafe, dll.) TIDAK terpengaruh.
+     *                              Jika null, Reporting Rate menampilkan mode distribusi.
+     * @return array
+     */
+    public function getCharts(
+        ?string $fungsi = null,
+        ?int $tahun = null,
+        ?int $bulan = null,
+        ?int $pekaYear = null,
+        ?int $koYear = null,
+        ?int $koMonth = null,
+        ?int $rrYear = null,
+        ?int $rrMonth = null,
+        bool $hasRrFilter = false
+    ): array {
+        $finalRrYear  = $hasRrFilter ? $rrYear : ($rrYear ?? $tahun);
+        $finalRrMonth = $hasRrFilter ? $rrMonth : ($rrMonth ?? $bulan);
+
+        return [
+            'fungsi'            => $this->chartJumlahPerFungsi($fungsi, $tahun),
+            'fungsi_info'       => $this->chartFungsiInfo($fungsi, $tahun),
+            'reporting_lhd'     => $this->chartReportingRateLhd($tahun, $bulan),
+            'reporting'         => $this->chartReportingRate($fungsi, $finalRrYear, $finalRrMonth),
+            'trending'          => $this->chartTrendingTemuan($fungsi, $pekaYear ?? $tahun),
+            'kategori'          => $this->chartKategoriPeka($fungsi, $tahun),
+            'keterlibatan'      => $this->chartKeterlibatan($fungsi, $koYear ?? $tahun, $koMonth ?? $bulan),
+            'persentase_fungsi' => $this->chartPersentaseFungsi($fungsi, $tahun),
+            'tindak_lanjut'     => $this->chartTindakLanjut($fungsi, $tahun),
+            'unsafe_action'     => $this->chartUnsafeAction($fungsi, $tahun),
+            'unsafe_condition'  => $this->chartUnsafeCondition($fungsi, $tahun),
+        ];
+    }
+
+    /**
+     * Ambil data Chart Reporting Rate secara langsung.
+     */
+    public function getChartReportingRate(?string $fungsi, ?int $tahun, ?int $bulan): array
+    {
+        return $this->chartReportingRate($fungsi, $tahun, $bulan);
+    }
+
+    /**
+     * Ambil data Chart Keterlibatan Observasi secara langsung.
+     */
+    public function getChartKeterlibatan(?string $fungsi, ?int $tahun, ?int $bulan): array
+    {
+        return $this->chartKeterlibatan($fungsi, $tahun, $bulan);
+    }
+
+    /**
+     * Ambil data chart khusus untuk Executive Summary PDF (YTD cutoff s/d bulan terpilih).
+     *
+     * ISOLATED METHOD: TIDAK mengubah behavior getCharts() atau baseQuery() yang digunakan dashboard web.
+     * Semua seksi dihitung dengan cutoff Januari s/d $bulan pada $tahun yang dipilih.
+     * Section 2 (Reporting Rate) dan Section 6 (Keterlibatan) mereuse method existing yang sudah benar.
+     *
+     * @param  string|null $fungsi null = global (semua fungsi)
+     * @param  int         $tahun  4-digit year
+     * @param  int         $bulan  1–12 bulan cutoff
+     * @return array
+     */
+    public function getChartsYtd(?string $fungsi = null, int $tahun = 2026, int $bulan = 12): array
+    {
+        return [
+            'fungsi'            => $this->chartJumlahPerFungsi($fungsi, $tahun),
+            'fungsi_info'       => $this->chartFungsiInfo($fungsi, $tahun),
+            'reporting_lhd'     => $this->chartReportingRateLhd($tahun, $bulan),
+            'reporting'         => $this->chartReportingRate($fungsi, $tahun, $bulan),
+            'trending'          => $this->chartTrendingTemuanYtd($fungsi, $tahun, $bulan),
+            'kategori'          => $this->chartKategoriPekaYtd($fungsi, $tahun, $bulan),
+            'keterlibatan'      => $this->chartKeterlibatan($fungsi, $tahun, $bulan),
+            'persentase_fungsi' => $this->chartPersentaseFungsiYtd($fungsi, $tahun, $bulan),
+            'tindak_lanjut'     => $this->chartTindakLanjutYtd($fungsi, $tahun, $bulan),
+            'unsafe_action'     => $this->chartUnsafeActionYtd($fungsi, $tahun, $bulan),
+            'unsafe_condition'  => $this->chartUnsafeConditionYtd($fungsi, $tahun, $bulan),
+        ];
+    }
+
+    /**
+     * Chart Trending Temuan YTD khusus Executive Summary PDF.
+     *
+     * Menampilkan 12 bulan (Jan–Des). Bulan s/d $bulan berisi data aktual,
+     * bulan setelah $bulan bernilai 0 (tidak ada data masa depan yang bocor).
+     * annual_total, closed_total, dan closing_rate dihitung kumulatif Jan–$bulan.
+     */
+    private function chartTrendingTemuanYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $bulanLabels = [
+            1 => 'Jan', 2 => 'Feb', 3  => 'Mar', 4  => 'Apr',
+            5 => 'Mei', 6 => 'Jun', 7  => 'Jul', 8  => 'Agu',
+            9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
+        ];
+
+        $emptyMonth = [
+            'safe_action'      => 0,
+            'safe_condition'   => 0,
+            'unsafe_action'    => 0,
+            'unsafe_condition' => 0,
+            'total'            => 0,
+        ];
+        $monthlyData = [];
+        for ($i = 1; $i <= 12; $i++) {
+            $monthlyData[$i] = ['month' => $bulanLabels[$i]] + $emptyMonth;
+        }
+
+        $kategoriMap = [
+            'Tindakan aman'       => 'safe_action',
+            'Kondisi aman'        => 'safe_condition',
+            'Tindakan tidak aman' => 'unsafe_action',
+            'Kondisi tidak aman'  => 'unsafe_condition',
+        ];
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        $rows = $this->ytdQuery($fungsi, $tahun, $bulan)
+            ->selectRaw("
+                MONTH(STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i')) AS bulan_ke,
+                JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.kategori'))  AS kategori,
+                COUNT(*) AS cnt
+            ")
+            ->groupBy('bulan_ke', 'kategori')
+            ->orderBy('bulan_ke')
+            ->get();
+
+        foreach ($rows as $row) {
+            $bln = (int) $row->bulan_ke;
+            if ($bln < 1 || $bln > $bulan) {
+                continue;
+            }
+
+            $key = $kategoriMap[$row->kategori] ?? null;
+            $cnt = (int) $row->cnt;
+
+            $monthlyData[$bln]['total'] += $cnt;
+            if ($key !== null) {
+                $monthlyData[$bln][$key] += $cnt;
+            }
+        }
+
+        $ytdTotal = 0;
+        for ($i = 1; $i <= $bulan; $i++) {
+            $ytdTotal += $monthlyData[$i]['total'];
+        }
+
+        $closedTotal = $this->ytdQuery($fungsi, $tahun, $bulan)
+            ->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'closed'")
+            ->count();
+
+        $closingRate = ($ytdTotal > 0)
+            ? round(($closedTotal / $ytdTotal) * 100, 2)
+            : 0;
+
+        return [
+            'months'       => array_values($monthlyData),
+            'annual_total' => $ytdTotal,
+            'closed_total' => $closedTotal,
+            'closing_rate' => $closingRate,
+            'year'         => $tahun,
+            'bulan'        => $bulan,
+        ];
+    }
+
+    /**
+     * Chart 3 — Kategori PEKA YTD khusus Executive Summary PDF.
+     */
+    private function chartKategoriPekaYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $kategoriMap = [
+            'Tindakan aman'      => 'Safe Action',
+            'Kondisi aman'       => 'Safe Condition',
+            'Tindakan tidak aman'=> 'Unsafe Action',
+            'Kondisi tidak aman' => 'Unsafe Condition',
+        ];
+
+        $rawData = $this->ytdQuery($fungsi, $tahun, $bulan)
+            ->selectRaw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.kategori')) as label, COUNT(*) as total")
+            ->groupBy('label')
+            ->orderBy('label')
+            ->pluck('total', 'label')
+            ->toArray();
+
+        $result = [];
+        foreach ($kategoriMap as $dbKey => $displayLabel) {
+            $result[$displayLabel] = $rawData[$dbKey] ?? 0;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 4 — Rekap Persentase Temuan per Fungsi YTD khusus Executive Summary PDF.
+     */
+    private function chartPersentaseFungsiYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        $result      = [];
+
+        foreach ($fungsiScope as $f) {
+            $row = $this->ytdQuery($f, $tahun, $bulan)
+                ->selectRaw("
+                    COUNT(*) as total,
+                    SUM(CASE WHEN LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'closed' THEN 1 ELSE 0 END) as total_closed
+                ")
+                ->first();
+
+            $total  = $row->total ?? 0;
+            $closed = $row->total_closed ?? 0;
+
+            if ($total === 0) {
+                $result[$f] = ['closed' => 0, 'open' => 0];
+            } else {
+                $closedPct  = round(($closed / $total) * 100, 1);
+                $result[$f] = [
+                    'closed' => $closedPct,
+                    'open'   => round(100 - $closedPct, 1),
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 5 — Rekap Persentase Penindak Lanjut / SAP YTD khusus Executive Summary PDF.
+     */
+    private function chartTindakLanjutYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+
+        $totalSap = $this->ytdQuery(null, $tahun, $bulan)
+            ->whereNotNull('no_notifikasi_sap')
+            ->where('no_notifikasi_sap', '!=', '')
+            ->count();
+
+        if ($totalSap === 0) {
+            $result = [];
+            foreach ($fungsiScope as $f) {
+                $result[$f] = 0;
+            }
+            return $result;
+        }
+
+        $result = [];
+        foreach ($fungsiScope as $f) {
+            $count = $this->ytdQuery($f, $tahun, $bulan)
+                ->whereNotNull('no_notifikasi_sap')
+                ->where('no_notifikasi_sap', '!=', '')
+                ->count();
+
+            $result[$f] = round(($count / $totalSap) * 100);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 7 — Unsafe Action Category YTD khusus Executive Summary PDF.
+     * 6 kategori urutan tetap.
+     */
+    private function chartUnsafeActionYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $categories = [
+            'Tidak mengikuti Prosedur / Failure to follow procedure'
+                => 'Failure to Follow Procedure',
+            'Tidak menggunakan APD yang standard / Using improper PPE'
+                => 'Using Improper PPE',
+            'Posisi kerja yang tidak tepat / Improper position for task'
+                => 'Improper Position for Task',
+            'Penempatan tidak sesuai / Improper Placement'
+                => 'Improper Placement',
+            'Mengoperasikan diluar standar/operating out of standard'
+                => 'Operating Out of Standard',
+            'Menggunakan peralatan yang tidak standard/rusak / Using defective tools/equipments'
+                => 'Using Defective Tools/Equipments',
+        ];
+
+        return $this->buildCategoryChartYtd('unsafe_action', $categories, $fungsi, $tahun, $bulan);
+    }
+
+    /**
+     * Chart 8 — Unsafe Condition Category YTD khusus Executive Summary PDF.
+     * 12 kategori urutan tetap.
+     */
+    private function chartUnsafeConditionYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        $categories = [
+            'Rambu-rambu yang tidak cukup/ Inadequate warning system'
+                => 'Inadequate Warning System',
+            'Peralatan yang tidak sesuai/ Incorrect tools/equipments'
+                => 'Incorrect Tools/Equipments',
+            'Peralatan yang rusak / Defective tools/equipments'
+                => 'Defective Tools/Equipments',
+            'Pengukuran yang tidak tepat/Improper measurement'
+                => 'Improper Measurement',
+            'Pengaman yang tidak cukup/Inadequate Guards/Barriers'
+                => 'Inadequate Guards/Barriers',
+            'Mode operasi yang tidak layak / Inadequate operation mode'
+                => 'Inadequate Operation Mode',
+            'Material yang tidak tepat / Incorrect material'
+                => 'Incorrect Material',
+            'Kondisi lantai/permukaan tidak layak / Inadequate condition of floor/surface'
+                => 'Inadequate Condition of Floor/Surface',
+            'Keterbatasan ruangan untuk kerja / Restricted space of action'
+                => ['Restricted Space of Action', 'keterbatasan ruangan', 'restricted space'],
+            'Integritas peralatan yang tidak layak/ Inadequate integrity of equipment'
+                => ['Inadequate Integrity of Equipment', 'integritas peralatan'],
+            'Housekeeping yang tidak baik / Poor house keeping order'
+                => 'Poor house keeping',
+            'APD yang tidak cukup / Inadequate PPE'
+                => 'Inadequate PPE',
+        ];
+
+        return $this->buildCategoryChartYtd('unsafe_conditon', $categories, $fungsi, $tahun, $bulan);
+    }
+
+    /**
+     * Helper — bangun data chart kategori YTD (Chart 7 & 8) khusus Executive Summary PDF.
+     */
+    private function buildCategoryChartYtd(
+        string $jsonKey,
+        array $categories,
+        ?string $fungsi,
+        int $tahun,
+        int $bulan
+    ): array {
+        $data  = [];
+        $total = 0;
+
+        foreach ($categories as $key => $val) {
+            $label = is_string($key) ? $key : $val;
+            $search = is_array($val) ? $val : [$val];
+
+            $query = $this->ytdQuery($fungsi, $tahun, $bulan);
+            $query->where(function ($q) use ($jsonKey, $search) {
+                foreach ($search as $s) {
+                    $q->orWhereRaw(
+                        "LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.{$jsonKey}'))) LIKE ?",
+                        ['%' . strtolower($s) . '%']
+                    );
+                }
+            });
+
+            $count = $query->count();
+
+            $data[$label] = $count;
+            $total     += $count;
+        }
+
+        return ['data' => $data, 'total' => $total];
+    }
+
+    // -----------------------------------------------------------------
+    // CHART METHODS
+    // -----------------------------------------------------------------
+
+    /**
+     * Chart 1 — Jumlah Pelaporan per Fungsi (Pie) — data untuk chart.
+     * Mengembalikan array [fungsi => count] untuk dirender Chart.js.
+     */
+    private function chartJumlahPerFungsi(?string $fungsi, ?int $tahun): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        $result = [];
+
+        foreach ($fungsiScope as $f) {
+            $count = $this->baseQuery($f, $tahun)->count();
+            if ($count > 0) {
+                $result[$f] = $count;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 1 — Panel Info: total, breakdown per fungsi, tertinggi, terendah.
+     * Data berasal dari database (zero hardcoded).
+     */
+    private function chartFungsiInfo(?string $fungsi, ?int $tahun): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        $breakdown   = [];
+
+        foreach ($fungsiScope as $f) {
+            $count = $this->baseQuery($f, $tahun)->count();
+            $breakdown[$f] = $count;
+        }
+
+        $total = array_sum($breakdown);
+
+        $tertinggi = null;
+        $terendah  = null;
+
+        if (!empty($breakdown)) {
+            $maxVal    = max($breakdown);
+            $minVal    = min($breakdown);
+            $tertinggi = ['fungsi' => array_search($maxVal, $breakdown), 'jumlah' => $maxVal];
+            $terendah  = ['fungsi' => array_search($minVal, $breakdown), 'jumlah' => $minVal];
+        }
+
+        return [
+            'total'     => $total,
+            'breakdown' => $breakdown,
+            'tertinggi' => $tertinggi,
+            'terendah'  => $terendah,
+        ];
+    }
+
+    /**
+     * Chart 2a — Reporting Rate Area LHD (NEW).
+     *
+     * Menghitung Reporting Rate untuk seluruh area LHD (semua fungsi gabungan).
+     *
+     * Formula:
+     *   Rate = (total_temuan_Jan_sd_bulan / (total_manpower_semua_fungsi × bulan)) × 100
+     *
+     * total_manpower = jumlah manpower seluruh fungsi pada bulan yang dipilih.
+     * BUKAN jumlah kumulatif manpower per bulan.
+     *
+     * @param  int|null $tahun
+     * @param  int|null $bulan  1–12; null → mode tidak aktif
+     * @return array
+     */
+    private function chartReportingRateLhd(?int $tahun, ?int $bulan): array
+    {
+        // Jika tidak ada tahun atau bulan yang dipilih, kembalikan mode tidak aktif
+        if (!$tahun || !$bulan) {
+            return [
+                'aktif'          => false,
+                'rate'           => null,
+                'total_temuan'   => null,
+                'total_manpower' => null,
+                'jumlah_bulan'   => null,
+                'tersedia'       => false,
+                'periode_label'  => null,
+            ];
+        }
+
+        // 1. Hitung total temuan YTD (Januari s/d bulan terpilih, seluruh fungsi)
+        $totalTemuan = $this->ytdQuery(null, $tahun, $bulan)->count();
+
+        // 2. Hitung total manpower seluruh fungsi pada bulan terpilih
+        $totalManpower = 0;
+        $manpowerTersedia = true;
+
+        foreach (self::FUNGSI_LIST as $f) {
+            $mp = MasterManpower::getManpower($tahun, $bulan, $f);
+            if ($mp === null) {
+                $manpowerTersedia = false;
+                break;
+            }
+            $totalManpower += $mp;
+        }
+
+        // 3. Hitung rate
+        $rate = null;
+        if ($manpowerTersedia && $totalManpower > 0) {
+            $denominator = $totalManpower * $bulan;
+            $rate = round($totalTemuan / $denominator, 2);
+        }
+
+        // 4. Label periode
+        $namaBulan = MasterManpower::BULAN_LABELS[$bulan] ?? "Bulan {$bulan}";
+        $periodeLabel = "Januari–{$namaBulan} {$tahun}";
+
+        return [
+            'aktif'          => true,
+            'rate'           => $rate,
+            'total_temuan'   => $totalTemuan,
+            'total_manpower' => $manpowerTersedia ? $totalManpower : null,
+            'jumlah_bulan'   => $bulan,
+            'tersedia'       => $manpowerTersedia,
+            'periode_label'  => $periodeLabel,
+        ];
+    }
+
+    /**
+     * Chart 2b — Reporting Rate per Fungsi (Horizontal Bar).
+     *
+     * Formula (saat bulan dipilih):
+     *   Rate_fungsi = total_temuan_YTD_fungsi / (manpower_fungsi_bulan × bulan)
+     *
+     * Formula (saat bulan tidak dipilih / mode distribusi):
+     *   Menampilkan distribusi jumlah pelaporan per fungsi (backward compatible).
+     *
+     * PENTING:
+     *   - ytdQuery() digunakan untuk menghitung temuan YTD — terpisah dari baseQuery()
+     *   - Manpower yang digunakan adalah manpower BULAN yang dipilih (bukan kumulatif)
+     *   - Jika manpower tidak tersedia, rate = null (bukan 0)
+     */
+    private function chartReportingRate(?string $fungsi, ?int $tahun, ?int $bulan = null): array
+    {
+        $fungsiList = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+
+        // Mode: tidak ada tahun atau bulan → tampilkan distribusi lama
+        if (!$tahun || !$bulan) {
+            $data = [];
+            $sumScopeTemuan   = 0;
+            $sumScopeManpower = 0;
+
+            foreach ($fungsiList as $f) {
+                $jumlahPelaporan  = $this->baseQuery($f, $tahun)->count();
+                $sumScopeTemuan  += $jumlahPelaporan;
+
+                $mpQuery = MasterManpower::where('fungsi', $f);
+                if ($tahun) {
+                    $mpQuery->where('tahun', $tahun);
+                }
+                $manpower = (int) $mpQuery->sum('jumlah_manpower');
+                $sumScopeManpower += $manpower;
+
+                if ($manpower > 0) {
+                    $data[$f] = round($jumlahPelaporan / $manpower, 2);
+                } else {
+                    $data[$f] = 0;
+                }
+            }
+
+            // AREA LHD — hanya untuk global (fungsi = null)
+            if (!$fungsi) {
+                if ($sumScopeManpower > 0) {
+                    $data['AREA LHD'] = round($sumScopeTemuan / $sumScopeManpower, 2);
+                } else {
+                    $data['AREA LHD'] = 0;
+                }
+
+                // Urutkan: AREA LHD di atas
+                $ordered = ['AREA LHD' => $data['AREA LHD']];
+                foreach (self::FUNGSI_LIST as $f) {
+                    $ordered[$f] = $data[$f] ?? 0;
+                }
+                $data = $ordered;
+            }
+
+            return [
+                'mode'          => 'distribusi',
+                'data'          => $data,
+                'periode_label' => $tahun ? "Tahun {$tahun}" : 'Semua Waktu',
+            ];
+        }
+
+        // Mode: tahun + bulan dipilih → gunakan formula YTD dengan manpower bulanan
+        $data           = [];
+        $namaBulan      = MasterManpower::BULAN_LABELS[$bulan] ?? "Bulan {$bulan}";
+        $periodeLabel   = "Januari–{$namaBulan} {$tahun}";
+
+        foreach ($fungsiList as $f) {
+            // Temuan YTD: Januari s/d bulan terpilih
+            $totalTemuan = $this->ytdQuery($f, $tahun, $bulan)->count();
+
+            // Manpower: hanya bulan yang dipilih (bukan kumulatif)
+            $manpower = MasterManpower::getManpower($tahun, $bulan, $f);
+
+            if ($manpower === null) {
+                // Manpower tidak tersedia — jangan menghitung
+                $data[$f] = null;
+            } elseif ($manpower === 0) {
+                // Manpower nol — hindari division by zero
+                $data[$f] = null;
+            } else {
+                $denominator = $manpower * $bulan;
+                $data[$f]    = round($totalTemuan / $denominator, 2);
+            }
+        }
+
+        // Untuk global dashboard, hitung AREA LHD dan letakkan di posisi pertama
+        if (!$fungsi) {
+            $lhdTemuan    = $this->ytdQuery(null, $tahun, $bulan)->count();
+            $lhdManpower  = 0;
+            $lhdTersedia  = true;
+            foreach (self::FUNGSI_LIST as $f) {
+                $mp = MasterManpower::getManpower($tahun, $bulan, $f);
+                if ($mp === null) { $lhdTersedia = false; break; }
+                $lhdManpower += $mp;
+            }
+            $lhdRate = ($lhdTersedia && $lhdManpower > 0)
+                ? round($lhdTemuan / ($lhdManpower * $bulan), 2)
+                : null;
+
+            // Susun ulang: AREA LHD di atas
+            $data = array_merge(['AREA LHD' => $lhdRate], $data);
+        }
+
+        return [
+            'mode'          => 'manpower_rasio',
+            'data'          => $data,
+            'periode_label' => $periodeLabel,
+        ];
+    }
+
+    /**
+     * Chart Trending Temuan — Rekap PEKA Bulanan (Stacked Bar + Total Line).
+     *
+     * Menampilkan rekap PEKA per bulan sepanjang tahun yang dipilih:
+     *   - 4 kategori stacked bar: Safe Action, Safe Condition, Unsafe Action, Unsafe Condition
+     *   - Total line per bulan (termasuk N/A)
+     *   - Annual total, Closed total, Closing Rate tahunan
+     *
+     * Selalu mengembalikan 12 bulan (Jan–Des). Bulan tanpa data = 0.
+     *
+     * PENTING: Hanya mengikuti filter TAHUN, bukan filter bulan.
+     * Dropdown bulan Reporting Rate TIDAK memengaruhi chart ini.
+     *
+     * Mapping kategori DB → key:
+     *   'Tindakan aman'       → safe_action
+     *   'Kondisi aman'        → safe_condition
+     *   'Tindakan tidak aman' → unsafe_action
+     *   'Kondisi tidak aman'  → unsafe_condition
+     *   'N/A' / lainnya      → masuk total tapi tidak ditampilkan sebagai segment
+     *
+     * @param  string|null $fungsi
+     * @param  int|null    $tahun   Jika null, kembalikan struktur kosong
+     * @return array
+     */
+    private function chartTrendingTemuan(?string $fungsi, ?int $tahun): array
+    {
+        // Label bulan (singkatan)
+        $bulanLabels = [
+            1 => 'Jan', 2 => 'Feb', 3  => 'Mar', 4  => 'Apr',
+            5 => 'Mei', 6 => 'Jun', 7  => 'Jul', 8  => 'Agu',
+            9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
+        ];
+
+        // Inisialisasi 12 bulan dengan nilai 0
+        $emptyMonth = [
+            'safe_action'      => 0,
+            'safe_condition'   => 0,
+            'unsafe_action'    => 0,
+            'unsafe_condition' => 0,
+            'total'            => 0,
+        ];
+        $monthlyData = [];
+        for ($i = 1; $i <= 12; $i++) {
+            $monthlyData[$i] = ['month' => $bulanLabels[$i]] + $emptyMonth;
+        }
+
+        // Jika tidak ada tahun, kembalikan struktur kosong
+        if (!$tahun) {
+            return [
+                'months'       => array_values($monthlyData),
+                'annual_total' => 0,
+                'closed_total' => 0,
+                'closing_rate' => 0,
+                'year'         => null,
+            ];
+        }
+
+        // ------------------------------------------------------------------
+        // Mapping: nilai DB → key array bulan
+        // ------------------------------------------------------------------
+        $kategoriMap = [
+            'Tindakan aman'       => 'safe_action',
+            'Kondisi aman'        => 'safe_condition',
+            'Tindakan tidak aman' => 'unsafe_action',
+            'Kondisi tidak aman'  => 'unsafe_condition',
+        ];
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        // ------------------------------------------------------------------
+        // Query 1 — GROUP BY bulan + kategori
+        // Mengambil semua kategori sekaligus dalam satu query
+        // Tidak mengubah baseQuery() — query terpisah yang identik strukturnya
+        // ------------------------------------------------------------------
+        $queryKat = SipekaFinding::query();
+
+        // Filter fungsi (logic sama persis dengan chartTrendingTemuan lama)
+        if ($fungsi) {
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+            if (!empty($sipValues)) {
+                $queryKat->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                $queryKat->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
+        }
+
+        // Filter tahun (LIKE '%tahun%' — identik dengan existing)
+        $queryKat->whereRaw("{$tanggalCol} LIKE ?", ["%{$tahun}%"]);
+
+        // GROUP BY bulan + kategori → satu pass semua data
+        $rows = $queryKat
+            ->selectRaw("
+                MONTH(STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i')) AS bulan_ke,
+                JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.kategori'))  AS kategori,
+                COUNT(*) AS cnt
+            ")
+            ->groupBy('bulan_ke', 'kategori')
+            ->orderBy('bulan_ke')
+            ->get();
+
+        // Distribusikan ke $monthlyData
+        foreach ($rows as $row) {
+            $bln = (int) $row->bulan_ke;
+            if ($bln < 1 || $bln > 12) {
+                continue;
+            }
+
+            $key = $kategoriMap[$row->kategori] ?? null;
+            $cnt = (int) $row->cnt;
+
+            // Semua kategori (termasuk N/A) masuk ke total
+            $monthlyData[$bln]['total'] += $cnt;
+
+            // Hanya 4 kategori mapped yang masuk ke segmen stacked bar
+            if ($key !== null) {
+                $monthlyData[$bln][$key] += $cnt;
+            }
+        }
+
+        // Annual total = jumlah seluruh monthly total
+        $annualTotal = array_sum(array_column($monthlyData, 'total'));
+
+        // ------------------------------------------------------------------
+        // Query 2 — Closed total
+        // Logic: LOWER(status) = 'closed' — identik dengan chartPersentaseFungsi()
+        // Tidak menggunakan baseQuery() agar tidak mengubah behavior-nya
+        // ------------------------------------------------------------------
+        $queryClosed = SipekaFinding::query();
+
+        if ($fungsi) {
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+            if (!empty($sipValues)) {
+                $queryClosed->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                $queryClosed->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
+        }
+
+        $closedTotal = $queryClosed
+            ->whereRaw("{$tanggalCol} LIKE ?", ["%{$tahun}%"])
+            ->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'closed'")
+            ->count();
+
+        // Closing Rate (%)
+        $closingRate = ($annualTotal > 0)
+            ? round(($closedTotal / $annualTotal) * 100, 2)
+            : 0;
+
+        return [
+            'months'       => array_values($monthlyData),
+            'annual_total' => $annualTotal,
+            'closed_total' => $closedTotal,
+            'closing_rate' => $closingRate,
+            'year'         => $tahun,
+        ];
+    }
+
+    /**
+     * Chart 3 — Kategori PEKA (Pie).
+     */
+    private function chartKategoriPeka(?string $fungsi, ?int $tahun): array
+    {
+        // Key DB (Bahasa Indonesia) => Label tampilan (Bahasa Inggris) sesuai referensi SIPEKA
+        $kategoriMap = [
+            'Tindakan aman'      => 'Safe Action',
+            'Kondisi aman'       => 'Safe Condition',
+            'Tindakan tidak aman'=> 'Unsafe Action',
+            'Kondisi tidak aman' => 'Unsafe Condition',
+        ];
+
+        $rawData = $this->baseQuery($fungsi, $tahun)
+            ->selectRaw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.kategori')) as label, COUNT(*) as total")
+            ->groupBy('label')
+            ->orderBy('label')
+            ->pluck('total', 'label')
+            ->toArray();
+
+        $result = [];
+        foreach ($kategoriMap as $dbKey => $displayLabel) {
+            $result[$displayLabel] = $rawData[$dbKey] ?? 0;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 4 — Keterlibatan dalam Observasi (Stacked Bar %).
+     *
+     * Rumus:
+     *   % Keterlibatan = (distinct pelapor bulan terpilih) ÷ (manpower fungsi bulan terpilih) × 100
+     *
+     * Ketentuan:
+     *   - Filter pelapor menggunakan bulan + tahun spesifik (BUKAN kumulatif YTD)
+     *   - Jika $tahun atau $bulan null → return null per fungsi (data tidak cukup)
+     *   - Jika manpower tidak tersedia → return null (JANGAN gunakan fallback)
+     *   - 0% hanya mungkin jika benar-benar tidak ada pelapor (bukan karena data kosong)
+     *
+     * Struktur return:
+     *   ['fungsi' => float|null]
+     *   null  = manpower tidak tersedia / periode tidak dipilih
+     *   float = persen keterlibatan (0–100+)
+     */
+    private function chartKeterlibatan(?string $fungsi, ?int $tahun, ?int $bulan): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        $result      = [];
+
+        // Jika tahun atau bulan belum dipilih, tidak bisa menghitung keterlibatan
+        if (!$tahun || !$bulan) {
+            foreach ($fungsiScope as $f) {
+                $result[$f] = null;
+            }
+            return $result;
+        }
+
+        foreach ($fungsiScope as $f) {
+            // 1. Ambil manpower bulan terpilih
+            $manpower = MasterManpower::getManpower($tahun, $bulan, $f);
+
+            // Manpower tidak tersedia → null (jangan hitung, jangan fallback)
+            if ($manpower === null || $manpower === 0) {
+                $result[$f] = null;
+                continue;
+            }
+
+            // 2. Hitung distinct pelapor kumulatif dari Januari s/d bulan terpilih (YTD)
+            $distinctPelapor = $this->ytdQuery($f, $tahun, $bulan)
+                ->distinct()
+                ->count(DB::raw("NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), '')"));
+
+            // 3. Hitung rate (tidak di-cap 100 — biarkan apa adanya untuk deteksi anomali)
+            $rate       = round(($distinctPelapor / $manpower) * 100, 2);
+            $result[$f] = $rate;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 5 — Rekap Persentase Temuan per Fungsi (Stacked Bar).
+     *
+     * Menghitung persentase temuan (Closed & Open) per fungsi berdasarkan Asset Owner
+     * sesuai arahan final mentor:
+     * - Pengelompokan temuan berdasarkan Asset Owner (bukan fungsi pelapor).
+     * - Temuan yang belum memiliki Asset Owner (kosong, NULL, whitespace) dikecualikan.
+     * - Temuan baru masuk ke perhitungan setelah Asset Owner-nya terisi.
+     * - Pengelompokan fungsi mengikuti MasterFunctionMapping.
+     * - Rumus persentase existing tetap dipertahankan:
+     *     closed = round(($closed / $total) * 100, 1)
+     *     open   = round(100 - $closedPct, 1)
+     *
+     * Mengembalikan ['FungsiName' => ['closed' => %, 'open' => %]]
+     */
+    private function chartPersentaseFungsi(?string $fungsi, ?int $tahun): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        $result      = [];
+
+        foreach ($fungsiScope as $f) {
+            $row = $this->assetOwnerQuery($f, $tahun)
+                ->selectRaw("
+                    COUNT(*) as total,
+                    SUM(CASE WHEN LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'closed' THEN 1 ELSE 0 END) as total_closed
+                ")
+                ->first();
+
+            $total  = $row->total ?? 0;
+            $closed = $row->total_closed ?? 0;
+
+            if ($total === 0) {
+                $result[$f] = ['closed' => 0, 'open' => 0];
+            } else {
+                $closedPct  = round(($closed / $total) * 100, 1);
+                $result[$f] = [
+                    'closed' => $closedPct,
+                    'open'   => round(100 - $closedPct, 1),
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 6 — Rekap Persentase Penindak Lanjut / By SAP (Donut).
+     *
+     * % distribusi finding ber-SAP per fungsi terhadap total ber-SAP dalam scope.
+     */
+    private function chartTindakLanjut(?string $fungsi, ?int $tahun): array
+    {
+        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+
+        $totalSap = $this->baseQuery(null, $tahun)
+            ->whereNotNull('no_notifikasi_sap')
+            ->where('no_notifikasi_sap', '!=', '')
+            ->count();
+
+        if ($totalSap === 0) {
+            $result = [];
+            foreach ($fungsiScope as $f) {
+                $result[$f] = 0;
+            }
+            return $result;
+        }
+
+        $result = [];
+        foreach ($fungsiScope as $f) {
+            $count = $this->baseQuery($f, $tahun)
+                ->whereNotNull('no_notifikasi_sap')
+                ->where('no_notifikasi_sap', '!=', '')
+                ->count();
+
+            $result[$f] = round(($count / $totalSap) * 100);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Chart 7 — Unsafe Action Category (Horizontal Bar).
+     *
+     * 6 kategori dengan urutan dan label bilingual TETAP sesuai referensi.
+     * Urutan ini tidak boleh diubah berdasarkan nilai/sorting apapun.
+     */
+    private function chartUnsafeAction(?string $fungsi, ?int $tahun): array
+    {
+        $categories = [
+            // key = label yang ditampilkan di chart
+            // value = string yang di-LIKE ke kolom unsafe_action di JSON
+            'Tidak mengikuti Prosedur / Failure to follow procedure'
+                => 'Failure to Follow Procedure',
+            'Tidak menggunakan APD yang standard / Using improper PPE'
+                => 'Using Improper PPE',
+            'Posisi kerja yang tidak tepat / Improper position for task'
+                => 'Improper Position for Task',
+            'Penempatan tidak sesuai / Improper Placement'
+                => 'Improper Placement',
+            'Mengoperasikan diluar standar/operating out of standard'
+                => 'Operating Out of Standard',
+            'Menggunakan peralatan yang tidak standard/rusak / Using defective tools/equipments'
+                => 'Using Defective Tools/Equipments',
+        ];
+
+        return $this->buildCategoryChart('unsafe_action', $categories, $fungsi, $tahun);
+    }
+
+    /**
+     * Chart 8 — Unsafe Condition Category (Horizontal Bar).
+     *
+     * 12 kategori dengan urutan dan label bilingual TETAP sesuai referensi.
+     * Urutan ini tidak boleh diubah berdasarkan nilai/sorting apapun.
+     *
+     * Catatan: kolom Excel menggunakan typo "unsafe_conditon" (tanpa 'i' kedua).
+     */
+    private function chartUnsafeCondition(?string $fungsi, ?int $tahun): array
+    {
+        $categories = [
+            // key = label yang ditampilkan di chart
+            // value = string yang di-LIKE ke kolom unsafe_conditon di JSON
+            'Rambu-rambu yang tidak cukup/ Inadequate warning system'
+                => 'Inadequate Warning System',
+            'Peralatan yang tidak sesuai/ Incorrect tools/equipments'
+                => 'Incorrect Tools/Equipments',
+            'Peralatan yang rusak / Defective tools/equipments'
+                => 'Defective Tools/Equipments',
+            'Pengukuran yang tidak tepat/Improper measurement'
+                => 'Improper Measurement',
+            'Pengaman yang tidak cukup/Inadequate Guards/Barriers'
+                => 'Inadequate Guards/Barriers',
+            'Mode operasi yang tidak layak / Inadequate operation mode'
+                => 'Inadequate Operation Mode',
+            'Material yang tidak tepat / Incorrect material'
+                => 'Incorrect Material',
+            'Kondisi lantai/permukaan tidak layak / Inadequate condition of floor/surface'
+                => 'Inadequate Condition of Floor/Surface',
+            'Keterbatasan ruangan untuk kerja / Restricted space of action'
+                => ['Restricted Space of Action', 'keterbatasan ruangan', 'restricted space'],
+            'Integritas peralatan yang tidak layak/ Inadequate integrity of equipment'
+                => ['Inadequate Integrity of Equipment', 'integritas peralatan'],
+            'Housekeeping yang tidak baik / Poor house keeping order'
+                => 'Poor house keeping',
+            'APD yang tidak cukup / Inadequate PPE'
+                => 'Inadequate PPE',
+        ];
+
+        // Catatan: kolom Excel menggunakan typo "unsafe_conditon" (tanpa 'i')
+        return $this->buildCategoryChart('unsafe_conditon', $categories, $fungsi, $tahun);
+    }
+
+    /**
+     * Helper — bangun data chart kategori (Chart 7 & 8).
+     *
+     * Menggunakan LIKE karena satu record bisa berisi beberapa sub-kategori.
+     *
+     * @return array  ['data' => ['Cat' => count, ...], 'total' => int]
+     */
+    private function buildCategoryChart(
+        string $jsonKey,
+        array $categories,
+        ?string $fungsi,
+        ?int $tahun
+    ): array {
+        $data  = [];
+        $total = 0;
+
+        foreach ($categories as $key => $val) {
+            $label = is_string($key) ? $key : $val;
+            $search = is_array($val) ? $val : [$val];
+
+            $query = $this->baseQuery($fungsi, $tahun);
+            $query->where(function ($q) use ($jsonKey, $search) {
+                foreach ($search as $s) {
+                    $q->orWhereRaw(
+                        "LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.{$jsonKey}'))) LIKE ?",
+                        ['%' . strtolower($s) . '%']
+                    );
+                }
+            });
+
+            $count = $query->count();
+
+            $data[$label] = $count;
+            $total     += $count;
+        }
+
+        return ['data' => $data, 'total' => $total];
+    }
+
+    // -----------------------------------------------------------------
+    // REKAP PELAPOR — Per Fungsi (Operation, Maintenance, HSSE, Business Support)
+    // -----------------------------------------------------------------
+
+    /**
+     * Rekap pelapor temuan per fungsi.
+     *
+     * Menggunakan Master Mapping untuk menentukan fungsi_sipeka yang termasuk
+     * ke dalam fungsi dashboard tujuan (Operation, Maintenance, HSSE, Business Support).
+     *
+     * @param  string $fungsi    Nama fungsi dashboard ('Operation', 'Maintenance', 'HSSE', 'Business Support')
+     * @param  string $periode   '' | '1_day' | '3_days' | '1_week' | '1_month' | 'per_bulan'
+     * @param  int    $bulan     1-12, digunakan jika $periode === 'per_bulan'
+     * @param  int    $tahun     4-digit year, digunakan jika $periode === 'per_bulan'
+     * @param  string $search    Nama pelapor untuk filter (case-insensitive, partial match)
+     * @return array
+     */
+    public function getFunctionReporterRecap(
+        string $fungsi,
+        string $periode = '',
+        int $bulan = 0,
+        int $tahun = 0,
+        string $search = ''
+    ): array {
+        // 1. Scope fungsi via Master Mapping (tidak hardcode)
+        $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+
+        $query = SipekaFinding::query();
+
+        if (!empty($sipValues)) {
+            $query->whereIn(
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                $sipValues
+            );
+        } else {
+            // Fallback sementara jika mapping belum diinput
+            $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+        }
+
+        // 2. Filter periode berdasarkan data_sipeka->tanggal
+        $this->applyRekapPeriodeFilter($query, $periode, $bulan, $tahun);
+
+        // 3. Filter nama pelapor (WHERE sebelum GROUP BY, pada kolom JSON)
+        if (!empty(trim($search))) {
+            $query->whereRaw(
+                "TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))) LIKE ?",
+                ['%' . trim($search) . '%']
+            );
+        }
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        // 4. Satu query GROUP BY (pelapor, bulan) — COUNT(DISTINCT id_temuan)
+        $rows = $query
+            ->selectRaw("
+                COALESCE(
+                    NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.pelapor'))), ''),
+                    'Tidak Diketahui'
+                ) AS pelapor,
+                MONTH(STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i')) AS bulan_ke,
+                COUNT(DISTINCT id_temuan) AS jumlah_bulan
+            ")
+            ->groupBy('pelapor', 'bulan_ke')
+            ->get();
+
+        // 5. Bangun lookup: pelapor -> [bulan -> jumlah] dan hitung total per pelapor
+        $monthlyLookup = [];   // ['NamaPelapor'][1..12] = jumlah
+        $pelaporTotal  = [];   // ['NamaPelapor'] = jumlah_total
+
+        foreach ($rows as $r) {
+            $bln  = (int) $r->bulan_ke;
+            $nama = $r->pelapor;
+            $jml  = (int) $r->jumlah_bulan;
+
+            if ($bln >= 1 && $bln <= 12) {
+                $monthlyLookup[$nama][$bln] = $jml;
+                $pelaporTotal[$nama]        = ($pelaporTotal[$nama] ?? 0) + $jml;
+            }
+        }
+
+        // Urutkan pelapor: terbanyak laporan dulu, kemudian abjad
+        arsort($pelaporTotal);
+
+        // 6. Preload mapping NOPEK tanpa N+1 query:
+        // Prioritas 1: PelaporSipekaMapping manual (nama_sipeka_normalized -> personil->nopek)
+        // Prioritas 2: MasterPersonil exact match nama ternormalisasi
+        $manualMappings = PelaporSipekaMapping::with('personil:id,nopek,nama')->get();
+        $mappingLookup = [];
+        foreach ($manualMappings as $m) {
+            if ($m->personil && !empty($m->personil->nopek)) {
+                $mappingLookup[$m->nama_sipeka_normalized] = $m->personil->nopek;
+            }
+        }
+
+        $personilNopeks = MasterPersonil::whereNotNull('nopek')
+            ->where('nopek', '!=', '')
+            ->get(['nama', 'nopek']);
+        $personilLookup = [];
+        foreach ($personilNopeks as $p) {
+            $norm = PelaporSipekaMapping::normalize($p->nama);
+            $personilLookup[$norm] = $p->nopek;
+        }
+
+        // 7. Bangun array rekap dengan data bulanan lengkap Jan–Des dan NOPEK
+        $rekap = [];
+        foreach ($pelaporTotal as $nama => $total) {
+            $monthly = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $monthly[$m] = $monthlyLookup[$nama][$m] ?? 0;
+            }
+
+            $normNama = PelaporSipekaMapping::normalize($nama);
+            $nopek    = $mappingLookup[$normNama] ?? $personilLookup[$normNama] ?? '-';
+
+            $rekap[] = [
+                'pelapor'      => $nama,
+                'nopek'        => $nopek,
+                'jumlah'       => $total,   // backward-compat untuk KPI
+                'jumlah_total' => $total,
+                'monthly'      => $monthly,
+            ];
+        }
+
+        // 8. Hitung monthly_totals — jumlah semua pelapor per bulan
+        $monthlyTotals = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $sum = 0;
+            foreach ($rekap as $row) {
+                $sum += $row['monthly'][$m];
+            }
+            $monthlyTotals[$m] = $sum;
+        }
+
+        $totalPelaporan = array_sum(array_column($rekap, 'jumlah_total'));
+        $totalPelapor   = count($rekap);
+
+        $pelapor_terbanyak = !empty($rekap)
+            ? ['nama' => $rekap[0]['pelapor'], 'jumlah' => $rekap[0]['jumlah_total']]
+            : ['nama' => '-', 'jumlah' => 0];
+
+        return [
+            'fungsi'            => $fungsi,
+            'rekap'             => $rekap,
+            'monthly_totals'    => $monthlyTotals,
+            'total_pelaporan'   => $totalPelaporan,
+            'total_pelapor'     => $totalPelapor,
+            'pelapor_terbanyak' => $pelapor_terbanyak,
+            'periode_label'     => $this->buildPeriodeLabel($periode, $bulan, $tahun),
+        ];
+    }
+
+    /**
+     * Rekap pelapor temuan Business Support.
+     * Pertahankan fungsi ini untuk backward compatibility.
+     *
+     * @param  string $periode   '' | '1_day' | '3_days' | '1_week' | '1_month' | 'per_bulan'
+     * @param  int    $bulan     1-12, digunakan jika $periode === 'per_bulan'
+     * @param  int    $tahun     4-digit year, digunakan jika $periode === 'per_bulan'
+     * @param  string $search    Nama pelapor untuk filter (case-insensitive, partial match)
+     * @return array
+     */
+    public function getBusinessSupportReporterRecap(
+        string $periode = '',
+        int $bulan = 0,
+        int $tahun = 0,
+        string $search = ''
+    ): array {
+        return $this->getFunctionReporterRecap('Business Support', $periode, $bulan, $tahun, $search);
+    }
+
+    /**
+     * Terapkan filter periode ke query berdasarkan data_sipeka->tanggal.
+     *
+     * Format tanggal di SIPEKA bervariasi, sehingga:
+     * - Filter relatif (1_day, dll.) menggunakan Carbon + STR_TO_DATE (dengan fallback LIKE)
+     * - Filter per_bulan menggunakan LIKE '%YYYY-MM%' dan '%MM/YYYY%'
+     */
+    private function applyRekapPeriodeFilter($query, string $periode, int $bulan, int $tahun): void
+    {
+        if (empty($periode)) {
+            return; // Semua Waktu — tanpa filter tanggal
+        }
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        if ($periode === 'per_bulan' && $bulan >= 1 && $bulan <= 12 && $tahun >= 2000) {
+            // Gunakan LIKE untuk mencocokkan format 'YYYY-MM' atau 'DD/MM/YYYY' dll.
+            $paddedBulan = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+            $query->where(function ($q) use ($tanggalCol, $tahun, $paddedBulan) {
+                // Format: "2026-01-..." atau "2026-01 ..."
+                $q->whereRaw("{$tanggalCol} LIKE ?", ["{$tahun}-{$paddedBulan}%"])
+                  ->orWhereRaw("{$tanggalCol} LIKE ?", ["%/{$tahun} {$paddedBulan}%"])
+                  ->orWhereRaw("{$tanggalCol} LIKE ?", ["%{$paddedBulan}/{$tahun}%"]);
+            });
+            return;
+        }
+
+        // Filter relatif: gunakan Carbon untuk batas bawah tanggal
+        $cutoff = match ($periode) {
+            '1_day'   => now()->subDay(),
+            '3_days'  => now()->subDays(3),
+            '1_week'  => now()->subWeek(),
+            '1_month' => now()->subMonth(),
+            default   => null,
+        };
+
+        if ($cutoff) {
+            // STR_TO_DATE agar bisa dibandingkan — format SIPEKA: "YYYY-MM-DD HH:MM"
+            $query->whereRaw(
+                "STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i') >= ?",
+                [$cutoff->format('Y-m-d H:i:s')]
+            );
+        }
+    }
+
+    /**
+     * Bangun label periode untuk ditampilkan di dashboard dan PDF.
+     */
+    private function buildPeriodeLabel(string $periode, int $bulan, int $tahun): string
+    {
+        if (empty($periode)) {
+            return 'Semua Waktu';
+        }
+
+        if ($periode === 'per_bulan') {
+            $namaBulan = [
+                1  => 'Januari', 2  => 'Februari', 3  => 'Maret',
+                4  => 'April',   5  => 'Mei',       6  => 'Juni',
+                7  => 'Juli',    8  => 'Agustus',   9  => 'September',
+                10 => 'Oktober', 11 => 'November',  12 => 'Desember',
+            ];
+            $nb = $namaBulan[$bulan] ?? "Bulan {$bulan}";
+            return "{$nb} {$tahun}";
+        }
+
+        return match ($periode) {
+            '1_day'   => '1 Hari Terakhir',
+            '3_days'  => '3 Hari Terakhir',
+            '1_week'  => '1 Minggu Terakhir',
+            '1_month' => '1 Bulan Terakhir',
+            default   => 'Semua Waktu',
+        };
+    }
+
+    // -----------------------------------------------------------------
+    // BASE QUERY HELPER
+    // -----------------------------------------------------------------
+
+    /**
+     * Base query dengan filter fungsi dan tahun yang sudah diterapkan.
+     *
+     * PENTING: baseQuery() digunakan oleh Chart 1, 3, 4, 6, 7, 8 dan KPI.
+     * Chart 5 menggunakan assetOwnerQuery() yang terpisah.
+     * Jangan mengubah perilaku baseQuery() untuk keperluan Reporting Rate.
+     * Gunakan ytdQuery() khusus untuk Reporting Rate.
+     *
+     * Filter fungsi menggunakan Master Mapping:
+     *   Jika mapping tersedia → WHERE fungsi_sipeka IN (...)
+     *   Jika mapping belum ada → fallback ke LIKE (behavior sebelumnya)
+     *
+     * Filter tahun menggunakan kolom JSON data_sipeka->tanggal.
+     *
+     * @param  string|null $fungsi
+     * @param  int|null    $tahun
+     */
+    private function baseQuery(?string $fungsi = null, ?int $tahun = null)
+    {
+        $query = SipekaFinding::query();
+
+        if ($fungsi) {
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+
+            if (!empty($sipValues)) {
+                // Mapping tersedia: gunakan whereIn untuk hasil yang presisi
+                $query->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                // Fallback: mapping belum diinput, gunakan LIKE seperti sebelumnya
+                // agar dashboard tidak rusak selama masa transisi
+                $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
+        }
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        if ($tahun) {
+            // Filter berdasarkan tahun saja (tidak per bulan)
+            $query->whereRaw(
+                "{$tanggalCol} LIKE ?",
+                ["%{$tahun}%"]
+            );
+        }
+
+        return $query;
+    }
+
+    /**
+     * Month Query — filter temuan untuk bulan + tahun spesifik (bukan kumulatif).
+     *
+     * Digunakan oleh chartKeterlibatan() untuk menghitung pelapor unik
+     * pada satu bulan tertentu (bukan YTD).
+     *
+     * @param  string|null $fungsi  null = semua fungsi
+     * @param  int         $tahun
+     * @param  int         $bulan   1–12
+     */
+    private function monthQuery(?string $fungsi, int $tahun, int $bulan)
+    {
+        $query = SipekaFinding::query();
+
+        // Filter fungsi
+        if ($fungsi) {
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+            if (!empty($sipValues)) {
+                $query->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
+        }
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        // Filter bulan spesifik (BUKAN kumulatif)
+        $bulanPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+        $lastDay     = date('t', mktime(0, 0, 0, $bulan, 1, $tahun));
+        $startDate   = "{$tahun}-{$bulanPadded}-01 00:00";
+        $endDate     = "{$tahun}-{$bulanPadded}-{$lastDay} 23:59";
+
+        $query->whereRaw(
+            "STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i') BETWEEN ? AND ?",
+            [$startDate, $endDate]
+        );
+
+        return $query;
+    }
+
+    /**
+     * YTD Query — khusus untuk Reporting Rate.
+     *
+     * Berbeda dari monthQuery(): query ini memfilter temuan dari Januari
+     * sampai bulan yang dipilih (year-to-date / kumulatif).
+     *
+     * Digunakan oleh chartReportingRate() dan chartReportingRateLhd().
+     * JANGAN gunakan untuk chart lain.
+     *
+     * @param  string|null $fungsi  null = semua fungsi (Area LHD)
+     * @param  int         $tahun
+     * @param  int         $bulan   1–12
+     */
+    private function ytdQuery(?string $fungsi, int $tahun, int $bulan)
+    {
+        $query = SipekaFinding::query();
+
+        // Filter fungsi
+        if ($fungsi) {
+            $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+            if (!empty($sipValues)) {
+                $query->whereIn(
+                    DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"),
+                    $sipValues
+                );
+            } else {
+                $query->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+            }
+        }
+
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        // Filter YTD: Januari (01) s/d bulan terpilih
+        $startDate = "{$tahun}-01-01 00:00";
+        $endPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+        $lastDay   = date('t', mktime(0, 0, 0, $bulan, 1, $tahun));
+        $endDate   = "{$tahun}-{$endPadded}-{$lastDay} 23:59";
+
+        $query->whereRaw(
+            "STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i') BETWEEN ? AND ?",
+            [$startDate, $endDate]
+        );
+
+        return $query;
+    }
+
+    /**
+     * Asset Owner Query — khusus untuk Chart 5 (Rekap Persentase Temuan per Fungsi).
+     *
+     * Berdasarkan arahan final mentor:
+     * - Pengelompokan temuan berdasarkan Asset Owner (bukan fungsi pelapor).
+     * - Temuan yang belum memiliki Asset Owner (kosong, NULL, whitespace) dikecualikan.
+     * - Temuan baru masuk ke perhitungan setelah Asset Owner-nya terisi.
+     * - Pengelompokan fungsi mengikuti MasterFunctionMapping.
+     * - Tidak ada fallback ke fungsi pelapor atau query LIKE.
+     * - Temuan kelompok khusus GM (Area Lahendong) dan temuan unmapped dikecualikan dari 4 fungsi utama.
+     *
+     * @param  string   $fungsi  Salah satu dari 4 fungsi utama (Operation, Maintenance, HSSE, Business Support)
+     * @param  int|null $tahun   Filter tahun dari JSON data_sipeka->tanggal
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function assetOwnerQuery(string $fungsi, ?int $tahun = null)
+    {
+        $query = SipekaFinding::query();
+
+        $assetOwnerCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.asset_owner'))";
+
+        // Temuan dengan Asset Owner kosong, NULL, 'null', atau whitespace-only dikecualikan
+        $query->whereNotNull(DB::raw($assetOwnerCol))
+              ->whereRaw("{$assetOwnerCol} != 'null'")
+              ->whereRaw("TRIM({$assetOwnerCol}) != ''");
+
+        // Ambil mapping Asset Owner resmi untuk fungsi dashboard ini
+        $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+
+        if (!empty($sipValues)) {
+            $query->whereIn(DB::raw($assetOwnerCol), $sipValues);
+        } else {
+            // Jika belum ada mapping sama sekali untuk fungsi ini, kembalikan query kosong
+            $query->whereRaw('1 = 0');
+        }
+
+        if ($tahun) {
+            $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+            $query->whereRaw(
+                "{$tanggalCol} LIKE ?",
+                ["%{$tahun}%"]
+            );
+        }
+
+        return $query;
+    }
+}

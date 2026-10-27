@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use App\Models\MasterFunctionMapping;
 
 class SipekaFinding extends Model
 {
@@ -87,6 +89,36 @@ class SipekaFinding extends Model
             ->selectRaw("MAX(MONTH(STR_TO_DATE({$tc}, '%Y-%m-%d %H:%i'))) AS max_bulan")
             ->whereRaw("{$tc} LIKE ?", ["{$tahun}%"])
             ->first();
+
+        return $row?->max_bulan !== null ? (int) $row->max_bulan : null;
+    }
+
+    /**
+     * Ambil bulan terakhir yang memiliki data SIPEKA aktual untuk fungsi tertentu pada tahun tertentu.
+     *
+     * Digunakan oleh Dashboard Per Fungsi untuk:
+     *   1. Menentukan periode bulan default otomatis secara dinamis.
+     *   2. Memvalidasi ketersediaan data SIPEKA untuk fungsi tersebut.
+     *
+     * @param  int    $tahun   Tahun 4 digit (mis. 2026)
+     * @param  string $fungsi  Nama fungsi standar (Operation, Maintenance, HSSE, Business Support)
+     * @return int|null        Nomor bulan terakhir (1–12), atau null jika tidak ada data
+     */
+    public static function maxBulanTahunFungsi(int $tahun, string $fungsi): ?int
+    {
+        $sipValues = MasterFunctionMapping::getSipekaValues($fungsi);
+        $q = static::query();
+
+        if (!empty($sipValues)) {
+            $q->whereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.fungsi'))"), $sipValues);
+        } else {
+            $q->where('data_sipeka->fungsi', 'like', "%{$fungsi}%");
+        }
+
+        $tc = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+        $row = $q->selectRaw("MAX(MONTH(STR_TO_DATE({$tc}, '%Y-%m-%d %H:%i'))) AS max_bulan")
+                 ->whereRaw("{$tc} LIKE ?", ["{$tahun}%"])
+                 ->first();
 
         return $row?->max_bulan !== null ? (int) $row->max_bulan : null;
     }

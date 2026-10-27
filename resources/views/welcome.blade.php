@@ -102,7 +102,7 @@
 
         .hero-right {
             background-color: var(--ink);
-            background-image: url('{{ asset('assets/images/hero-bg.jpg.JPG') }}');
+            background-image: url('{{ asset('assets/images/hero-bg.webp') }}');
             background-size: cover;
             background-position: center;
             position: relative; overflow: hidden;
@@ -289,5 +289,13 @@
     </footer>
     <div class="colorbar"><span></span><span></span><span></span></div>
 
+    <script>
+        // Deteksi pemulihan halaman dari Back-Forward Cache (BFCache)
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
 </body>
 </html>
