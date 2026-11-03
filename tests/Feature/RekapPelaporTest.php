@@ -8,6 +8,7 @@ use App\Models\MasterFunctionMapping;
 use App\Models\SipekaFinding;
 use App\Services\DashboardChartService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class RekapPelaporTest extends TestCase
 {
@@ -287,6 +288,120 @@ class RekapPelaporTest extends TestCase
             $this->assertArrayHasKey('rekap', $result);
             $this->assertArrayHasKey('monthly_totals', $result);
         }
+    }
+
+    protected function getOrCreateUser(string $username, string $role, ?string $fungsi = null): User
+    {
+        return User::updateOrCreate(
+            ['username' => $username],
+            [
+                'name'      => ucwords(str_replace('_', ' ', $username)),
+                'email'     => "{$username}@example.com",
+                'password'  => Hash::make('password123'),
+                'role'      => $role,
+                'fungsi'    => $fungsi,
+                'is_active' => true,
+            ]
+        );
+    }
+
+    /**
+     * 13. Admin HSSE baru (username non-admin) memiliki akses global ke seluruh fungsi Rekap Pelapor dan melihat switcher.
+     */
+    public function test_new_admin_hsse_has_full_access_and_sees_switcher(): void
+    {
+        $newAdmin = $this->getOrCreateUser('new_admin_hsse', 'Admin HSSE', 'HSSE');
+
+        $functions = ['operation', 'maintenance', 'hsse', 'business-support'];
+
+        foreach ($functions as $f) {
+            // Halaman Rekap Pelapor
+            $res = $this->actingAs($newAdmin)->get("/dashboard/fungsi/{$f}/rekap-pelapor");
+            $res->assertStatus(200);
+            $res->assertSee('Fungsi:');
+            $res->assertSee('Operation');
+            $res->assertSee('Maintenance');
+            $res->assertSee('HSSE');
+            $res->assertSee('Business Support');
+
+            // Export PDF
+            $pdfRes = $this->actingAs($newAdmin)->get("/dashboard/fungsi/{$f}/rekap-pelapor/pdf");
+            $pdfRes->assertStatus(200);
+            $this->assertStringContainsString('application/pdf', $pdfRes->headers->get('content-type', ''));
+        }
+    }
+
+    /**
+     * 14. Admin HSSE dengan username 'admin' tetap memiliki akses penuh dan melihat switcher.
+     */
+    public function test_admin_hsse_with_username_admin_retains_access_and_sees_switcher(): void
+    {
+        $adminUser = User::where('username', 'admin')->first() 
+            ?? $this->getOrCreateUser('admin', 'Admin HSSE', 'HSSE');
+
+        foreach (['operation', 'maintenance', 'hsse', 'business-support'] as $f) {
+            $res = $this->actingAs($adminUser)->get("/dashboard/fungsi/{$f}/rekap-pelapor");
+            $res->assertStatus(200);
+            $res->assertSee('Fungsi:');
+
+            $pdfRes = $this->actingAs($adminUser)->get("/dashboard/fungsi/{$f}/rekap-pelapor/pdf");
+            $pdfRes->assertStatus(200);
+        }
+    }
+
+    /**
+     * 15. Admin Function HSSE hanya dapat mengakses HSSE dan tidak melihat switcher fungsi.
+     */
+    public function test_admin_function_hsse_restricted_to_hsse(): void
+    {
+        $adminHsseF = User::where('username', 'admin_hsse_f')->first()
+            ?? $this->getOrCreateUser('admin_hsse_f', 'Admin Function', 'HSSE');
+
+        // Boleh akses HSSE, tetapi tidak melihat switcher
+        $resHsse = $this->actingAs($adminHsseF)->get('/dashboard/fungsi/hsse/rekap-pelapor');
+        $resHsse->assertStatus(200);
+        $resHsse->assertDontSee('Fungsi:');
+
+        // Dilarang akses fungsi lain
+        $this->actingAs($adminHsseF)->get('/dashboard/fungsi/operation/rekap-pelapor')->assertStatus(403);
+        $this->actingAs($adminHsseF)->get('/dashboard/fungsi/maintenance/rekap-pelapor')->assertStatus(403);
+        $this->actingAs($adminHsseF)->get('/dashboard/fungsi/business-support/rekap-pelapor')->assertStatus(403);
+
+        // PDF export otorisasi
+        $this->actingAs($adminHsseF)->get('/dashboard/fungsi/hsse/rekap-pelapor/pdf')->assertStatus(200);
+        $this->actingAs($adminHsseF)->get('/dashboard/fungsi/operation/rekap-pelapor/pdf')->assertStatus(403);
+        $this->actingAs($adminHsseF)->get('/dashboard/fungsi/maintenance/rekap-pelapor/pdf')->assertStatus(403);
+        $this->actingAs($adminHsseF)->get('/dashboard/fungsi/business-support/rekap-pelapor/pdf')->assertStatus(403);
+    }
+
+    /**
+     * 16. Manager HSSE dan Manager Function tetap mengikuti batasan hak akses yang berlaku.
+     */
+    public function test_manager_roles_authorization_and_no_switcher(): void
+    {
+        // Manager HSSE -> hanya HSSE
+        $mgrHsse = User::where('username', 'mgr_hsse')->first()
+            ?? $this->getOrCreateUser('mgr_hsse', 'Manager HSSE', 'HSSE');
+
+        $resMgrHsse = $this->actingAs($mgrHsse)->get('/dashboard/fungsi/hsse/rekap-pelapor');
+        $resMgrHsse->assertStatus(200);
+        $resMgrHsse->assertDontSee('Fungsi:');
+
+        $this->actingAs($mgrHsse)->get('/dashboard/fungsi/operation/rekap-pelapor')->assertStatus(403);
+        $this->actingAs($mgrHsse)->get('/dashboard/fungsi/maintenance/rekap-pelapor')->assertStatus(403);
+        $this->actingAs($mgrHsse)->get('/dashboard/fungsi/business-support/rekap-pelapor')->assertStatus(403);
+
+        // Manager Function (Operation) -> hanya Operation
+        $mgrOp = User::where('username', 'mgr_operation')->first()
+            ?? $this->getOrCreateUser('mgr_operation', 'Manager Function', 'Operation');
+
+        $resMgrOp = $this->actingAs($mgrOp)->get('/dashboard/fungsi/operation/rekap-pelapor');
+        $resMgrOp->assertStatus(200);
+        $resMgrOp->assertDontSee('Fungsi:');
+
+        $this->actingAs($mgrOp)->get('/dashboard/fungsi/hsse/rekap-pelapor')->assertStatus(403);
+        $this->actingAs($mgrOp)->get('/dashboard/fungsi/maintenance/rekap-pelapor')->assertStatus(403);
+        $this->actingAs($mgrOp)->get('/dashboard/fungsi/business-support/rekap-pelapor')->assertStatus(403);
     }
 }
 

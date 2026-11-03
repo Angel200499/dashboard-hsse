@@ -38,8 +38,8 @@
         </a>
     </div>
 
-    {{-- Switcher Fungsi untuk Superadmin --}}
-    @if(auth()->user()->role === 'Superadmin' || auth()->user()->username === 'admin')
+    {{-- Switcher Fungsi untuk Admin HSSE --}}
+    @if(auth()->user()->role === 'Admin HSSE' || auth()->user()->role === 'Superadmin')
         <div class="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200">
             <span class="text-xs font-bold text-slate-400 uppercase tracking-wider px-3">Fungsi:</span>
             @foreach(['Operation', 'Maintenance', 'HSSE', 'Business Support'] as $fn)

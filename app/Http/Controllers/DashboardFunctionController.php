@@ -409,20 +409,20 @@ class DashboardFunctionController extends Controller
 
     /**
      * Otorisasi hak akses Rekap Pelapor:
-     * - Superadmin memiliki akses global ke seluruh fungsi
-     * - Admin HSSE & Manager HSSE hanya dapat melihat Rekap Pelapor HSSE (kecuali Superadmin)
+     * - Admin HSSE (administrator utama sistem) memiliki akses ke seluruh fungsi (Operation, Maintenance, HSSE, Business Support)
+     * - Manager HSSE hanya dapat melihat Rekap Pelapor HSSE
      * - Admin Function & Manager Function hanya dapat melihat Rekap Pelapor fungsinya sendiri
      * - Role lain: tidak ada akses
      */
     private function canAccessRekapPelapor($user, string $targetFungsi): bool
     {
-        // 1. Superadmin (role Superadmin atau user 'admin') memiliki akses global
-        if ($user->role === 'Superadmin' || $user->username === 'admin') {
+        // 1. Admin HSSE memiliki akses global ke seluruh fungsi
+        if ($user->role === 'Admin HSSE' || $user->role === 'Superadmin') {
             return true;
         }
 
-        // 2. Admin HSSE & Manager HSSE hanya dapat melihat Rekap Pelapor HSSE
-        if ($user->role === 'Admin HSSE' || $user->role === 'Manager HSSE') {
+        // 2. Manager HSSE hanya dapat melihat Rekap Pelapor HSSE
+        if ($user->role === 'Manager HSSE') {
             return strtolower($targetFungsi) === 'hsse';
         }
 
