@@ -19,11 +19,12 @@
             --blue:   #0057B8;
             --blue-d: #003F8A;
             --green:  #9DBF2A;
-            --green-d:#89A924;
+            --green-d:#6E8A1A; /* darkened: #89A924 → #6E8A1A for WCAG AA on white (4.5:1) */
             --red:    #C8102E;
             --ink:    #222222;
             --body:   #3D4E60;
-            --muted:  #8699AD;
+            --muted:  #8699AD; /* used only for decorative/non-text; text uses --muted-text */
+            --muted-text: #5A6E82; /* WCAG AA on white & --bg: ≥4.5:1 */
             --rule:   #E8EDF3;
             --bg:     #F7F9FC;
             --white:  #FFFFFF;
@@ -53,7 +54,7 @@
         }
         .nav-logo { height: 44px; }
         .nav-right { display: flex; align-items: center; gap: 20px; }
-        .nav-label { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+        .nav-label { font-size: 12px; color: var(--muted-text); font-weight: 500; letter-spacing: 0.02em; }
         .nav-divider { width: 1px; height: 16px; background: var(--rule); }
         .nav-btn {
             display: inline-flex; align-items: center; gap: 7px;
@@ -74,7 +75,7 @@
         .hero-tag {
             display: inline-flex; align-items: center; gap: 10px;
             font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
-            text-transform: uppercase; color: var(--muted); margin-bottom: 36px;
+            text-transform: uppercase; color: var(--muted-text); margin-bottom: 36px;
         }
         .hero-tag::before {
             content: ''; display: block;
@@ -114,7 +115,7 @@
         .stat { padding: 40px 36px; border-right: 1px solid var(--rule); text-align: center; }
         .stat:last-child  { border-right: none; }
         .stat-num { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; margin-bottom: 8px; color: var(--ink); }
-        .stat-label { font-size: 14px; color: var(--muted); line-height: 1.5; font-weight: 500; }
+        .stat-label { font-size: 14px; color: var(--muted-text); line-height: 1.5; font-weight: 500; }
         
         .stat:nth-child(1) .stat-num { color: var(--blue); }
         .stat:nth-child(2) .stat-num { color: var(--red); }
@@ -165,10 +166,10 @@
 
         /* FOOTER */
         footer { background: var(--white); border-top: 1px solid var(--rule); padding: 24px 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-        footer p { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+        footer p { font-size: 13px; color: var(--muted-text); display: flex; align-items: center; gap: 5px; }
         footer .heart { color: var(--red); }
         .foot-links { display: flex; gap: 24px; }
-        .foot-links a { font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; transition: color .18s; }
+        .foot-links a { font-size: 13px; font-weight: 500; color: var(--muted-text); text-decoration: none; transition: color .18s; }
         .foot-links a:hover { color: var(--ink); }
         .colorbar { height: 4px; display: flex; }
         .colorbar span:nth-child(1) { flex: 3; background: var(--blue); }
@@ -212,6 +213,8 @@
         </div>
     </nav>
 
+    <main>
+
     <div class="hero">
         <div class="hero-left">
             <span class="hero-tag">HSSE · PGE Area Lahendong</span>
@@ -223,7 +226,7 @@
                 @else
                     <a href="{{ route('login') }}" class="btn-primary">Masuk ke Dashboard &rarr;</a>
                 @endauth
-                <a href="#tentang" class="btn-ghost" style="font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: color .18s; padding: 13px 26px;">Tentang PEKA &rsaquo;</a>
+                <a href="#tentang" class="btn-ghost" style="font-size: 13px; font-weight: 500; color: var(--muted-text); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: color .18s; padding: 13px 26px;">Tentang PEKA &rsaquo;</a>
             </div>
         </div>
         <div class="hero-right">
@@ -282,6 +285,8 @@
             <a href="{{ route('login') }}" class="btn-primary">Masuk ke Dashboard <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></a>
         @endauth
     </div>
+
+    </main>
 
     <footer>
         <p>&copy; {{ date('Y') }}, Made with <span class="heart">&#9829;</span> by HSSE PGE Area Lahendong</p>

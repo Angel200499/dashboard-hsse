@@ -334,9 +334,9 @@
             <ul><li>{!! $insights['s4'] !!}</li></ul>
         </div>
 
-        {{-- ============ SECTION 5: REKAP % PENINDAK LANJUT ============ --}}
+        {{-- ============ SECTION 5: REKAP % TEMUAN BER-SAP BERDASARKAN ASSET OWNER ============ --}}
         <div class="badge" style="left:257pt;top:258.5pt;">5</div>
-        <div class="sec-title" style="left:282pt;top:256pt;width:126pt;font-size:10pt;">Rekap % Penindak Lanjut<br>Temuan</div>
+        <div class="sec-title" style="left:282pt;top:256pt;width:130pt;font-size:9.5pt;line-height:11pt;">Rekap % Temuan Ber-SAP<br>Berdasarkan Asset Owner</div>
         @if(!empty($chartImages['chart5']))
             <img src="{{ $chartImages['chart5'] }}" class="chart-img" style="left:262pt;top:284pt;width:178pt;height:142pt;" alt="Chart 5">
         @else

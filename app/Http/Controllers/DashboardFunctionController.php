@@ -25,20 +25,36 @@ class DashboardFunctionController extends Controller
         // -----------------------------------------------------------------
         // Tentukan fungsi yang akan ditampilkan
         // -----------------------------------------------------------------
+        $validFunctions = ['Operation', 'Maintenance', 'HSSE', 'Business Support'];
+
+        // Normalisasi nama fungsi dari parameter URL jika dalam format slug/kebab-case/snake_case
+        $normalizedParam = null;
+        if ($nama_fungsi !== null) {
+            $cleaned = strtolower(str_replace(['-', '_'], ' ', trim($nama_fungsi)));
+            foreach ($validFunctions as $vf) {
+                if (strtolower($vf) === $cleaned) {
+                    $normalizedParam = $vf;
+                    break;
+                }
+            }
+            if ($normalizedParam === null) {
+                $normalizedParam = $nama_fungsi;
+            }
+        }
+
         if ($user->isHsseRole()) {
             // Admin HSSE / Manager HSSE bisa akses semua fungsi via URL
-            $fungsi = $nama_fungsi ?? $user->fungsi;
+            $fungsi = $normalizedParam ?? $user->fungsi;
         } else {
             // Admin Function / Manager Function hanya bisa akses fungsi sendiri
             $fungsi = $user->fungsi;
-            if ($nama_fungsi && strtolower($nama_fungsi) !== strtolower($fungsi)) {
+            if ($normalizedParam && strtolower($normalizedParam) !== strtolower($fungsi)) {
                 abort(403, 'Anda hanya dapat mengakses Dashboard Fungsi Anda sendiri.');
             }
         }
 
-        // Normalisasi nama fungsi (case-insensitive matching)
-        $validFunctions = ['Operation', 'Maintenance', 'HSSE', 'Business Support'];
-        $matched        = false;
+        // Normalisasi nama fungsi final (case-insensitive matching)
+        $matched = false;
         foreach ($validFunctions as $vf) {
             if (strtolower($vf) === strtolower($fungsi)) {
                 $fungsi  = $vf;
@@ -267,6 +283,125 @@ class DashboardFunctionController extends Controller
         }
 
         // -----------------------------------------------------------------
+        // GLOBAL CHARTS (Tab 2 — Dashboard Global)
+        // Gunakan parameter mandiri: g_year, g_month, g_peka_year
+        // null fungsi → data semua fungsi (sama persis dengan DashboardController)
+        // -----------------------------------------------------------------
+
+        // Filter tahun global (g_year)
+        // Jika g_year tidak dikirim tetapi filter tahun fungsi (year) aktif,
+        // gunakan tahun tersebut agar data globalCharts sinkron dengan periode fungsi terpilih.
+        $gYearRaw = $request->get('g_year');
+        $gYear    = ($gYearRaw && preg_match('/^\d{4}$/', $gYearRaw))
+                    ? (int) $gYearRaw
+                    : ($tahun ?? null);
+
+        // Filter bulan global (g_month)
+        $gMonthRaw = $request->get('g_month');
+        $gMonth    = ($gMonthRaw && is_numeric($gMonthRaw) && (int) $gMonthRaw >= 1 && (int) $gMonthRaw <= 12)
+                     ? (int) $gMonthRaw
+                     : null;
+
+        // Filter peka_year global (g_peka_year) — untuk chart Trending Temuan
+        $gPekaYearRaw = $request->get('g_peka_year');
+        $gPekaYear    = ($gPekaYearRaw && preg_match('/^\d{4}$/', $gPekaYearRaw))
+                        ? (int) $gPekaYearRaw
+                        : ($gYear ?? (int) now()->year);
+
+        // Max bulan SIPEKA global untuk tahun global
+        $gMaxBulanSipeka = $gYear ? SipekaFinding::maxBulanTahun($gYear) : null;
+        if ($gMonth !== null && $gMaxBulanSipeka !== null && $gMonth > $gMaxBulanSipeka) {
+            $gMonth = $gMaxBulanSipeka;
+        }
+
+        // Filter rr_year global (g_rr_year) — untuk Reporting Rate chart global
+        $gRrYearRaw = $request->get('g_rr_year');
+        $gRrYear    = ($gRrYearRaw && preg_match('/^\d{4}$/', $gRrYearRaw))
+                      ? (int) $gRrYearRaw
+                      : (int) now()->year;
+
+        // Filter rr_month global (g_rr_month)
+        if ($request->has('g_rr_month')) {
+            $gRrMonthRaw = $request->get('g_rr_month');
+            $gRrMonth = ($gRrMonthRaw !== null && $gRrMonthRaw !== '' && is_numeric($gRrMonthRaw) && (int) $gRrMonthRaw >= 1 && (int) $gRrMonthRaw <= 12)
+                        ? (int) $gRrMonthRaw
+                        : null;
+        } else {
+            $gRrMonth = SipekaFinding::maxBulanTahun($gRrYear);
+        }
+
+        // Filter ko_year global (g_ko_year) — untuk Keterlibatan Observasi global
+        $gKoYearRaw = $request->get('g_ko_year');
+        $gKoYear    = ($gKoYearRaw && preg_match('/^\d{4}$/', $gKoYearRaw))
+                      ? (int) $gKoYearRaw
+                      : (int) now()->year;
+
+        // Filter ko_month global (g_ko_month)
+        if ($request->has('g_ko_month')) {
+            $gKoMonthRaw = $request->get('g_ko_month');
+            $gKoMonth = ($gKoMonthRaw !== null && $gKoMonthRaw !== '' && is_numeric($gKoMonthRaw) && (int) $gKoMonthRaw >= 1 && (int) $gKoMonthRaw <= 12)
+                        ? (int) $gKoMonthRaw
+                        : null;
+        } else {
+            $gKoMonth = SipekaFinding::maxBulanTahun($gKoYear);
+        }
+
+        // Status global Keterlibatan
+        $gKoMaxBulan = SipekaFinding::maxBulanTahun($gKoYear);
+        $gKoStatus = 'ok';
+        if ($gKoMaxBulan === null) {
+            $gKoStatus = 'no_sipeka';
+        } elseif ($request->has('g_ko_month') && ($request->get('g_ko_month') === '' || $request->get('g_ko_month') === null)) {
+            $gKoStatus = 'no_month';
+        } elseif ($gKoMonth === null) {
+            $gKoStatus = 'no_month';
+        }
+
+        // Status global Reporting Rate
+        $gRrMaxBulan = SipekaFinding::maxBulanTahun($gRrYear);
+        $gRrStatus = 'ok';
+        if ($gRrMaxBulan === null) {
+            $gRrStatus = 'no_sipeka';
+        } elseif ($request->has('g_rr_month') && ($request->get('g_rr_month') === '' || $request->get('g_rr_month') === null)) {
+            $gRrStatus = 'all_months';
+        } elseif ($gRrMonth === null) {
+            $gRrStatus = 'no_sipeka';
+        }
+
+        // Fetch global charts — null fungsi = semua fungsi (identik dengan DashboardController)
+        $globalCharts = $this->chartService->getCharts(
+            null,           // fungsi: null = semua fungsi
+            $gYear,         // tahun (KPI / filter utama)
+            $gMonth,        // bulan (KPI / filter utama)
+            $gPekaYear,     // peka_year (Trending Temuan)
+            $gKoYear,       // ko_year (Keterlibatan)
+            $gKoMonth,      // ko_month (Keterlibatan)
+            $gRrYear,       // rr_year (Reporting Rate)
+            $gRrMonth,      // rr_month (Reporting Rate)
+            true            // hasRrFilter
+        );
+
+        // Global KPI — total semua fungsi (identik dengan DashboardController)
+        $globalKpiBase = SipekaFinding::query();
+        if ($gYear) {
+            $globalKpiBase->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal')) LIKE ?",
+                ["%{$gYear}%"]
+            );
+        }
+        $gTotal      = (clone $globalKpiBase)->count();
+        $gClosed     = (clone $globalKpiBase)->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'closed'")->count();
+        $gInProgress = (clone $globalKpiBase)->whereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.status'))) = 'open'")->whereNotNull('no_notifikasi_sap')->where('no_notifikasi_sap', '!=', '')->count();
+        $gOpen       = max(0, $gTotal - $gClosed - $gInProgress);
+
+        $globalKpi = [
+            'total'       => $gTotal,
+            'open'        => $gOpen,
+            'in_progress' => $gInProgress,
+            'closed'      => $gClosed,
+        ];
+
+        // -----------------------------------------------------------------
         // Tabel — FindingQueryService
         // Search + Filter Status + Filter Tahun + Sort + Pagination bersamaan
         // Difilter by $fungsi terlebih dahulu menggunakan mapping-aware filter
@@ -289,7 +424,22 @@ class DashboardFunctionController extends Controller
             'rrYear',
             'rrMonth',
             'rrStatus',
-            'rrMaxBulan'
+            'rrMaxBulan',
+            // Global Dashboard (Tab 2)
+            'globalCharts',
+            'globalKpi',
+            'gYear',
+            'gMonth',
+            'gPekaYear',
+            'gRrYear',
+            'gRrMonth',
+            'gRrStatus',
+            'gRrMaxBulan',
+            'gKoYear',
+            'gKoMonth',
+            'gKoStatus',
+            'gKoMaxBulan',
+            'gMaxBulanSipeka'
         ));
     }
 

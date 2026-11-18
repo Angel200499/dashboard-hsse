@@ -467,11 +467,15 @@
             </div>
         </div>
 
-        <!-- Chart 6: Persentase Penindak Lanjut (Donut) -->
+        <!-- Chart 6: Persentase Temuan Ber-SAP (Donut) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col h-[400px]">
-            <h3 class="text-[22px] font-bold text-slate-800 mb-4">6. Rekap Persentase Penindak Lanjut (By SAP)</h3>
-            <div class="flex-1 relative w-full h-full">
+            <h3 class="text-[22px] font-bold text-slate-800 mb-1">6. Rekap Persentase Temuan Ber-SAP Berdasarkan Asset Owner</h3>
+            <p class="text-xs text-slate-400 mb-4">Distribusi temuan ber-SAP seluruh fungsi berdasarkan Asset Owner</p>
+            <div class="flex-1 relative w-full h-full flex items-center justify-center">
                 <canvas id="chart6"></canvas>
+                <div id="chart6_empty" class="hidden text-center text-slate-400 text-sm py-8">
+                    Belum ada temuan berstatus SAP valid untuk periode ini.
+                </div>
             </div>
         </div>
 
@@ -1300,45 +1304,83 @@
             }
         });
 
-        // 6. Donut Chart - Rekap % Penindak Lanjut Temuan (SAP)
-        new Chart(document.getElementById('chart6'), {
-            type: 'doughnut',
-            data: { 
-                labels: getLabels(charts.tindak_lanjut), 
-                datasets: [{ 
-                    data: getValues(charts.tindak_lanjut), 
-                    backgroundColor: getBgColors(getLabels(charts.tindak_lanjut)) 
-                }] 
-            },
-            options: { 
-                ...commonOptions, 
-                plugins: { 
-                    legend: { 
-                        position: 'right',
-                        labels: {
-                            font: { size: 16, weight: 'bold', family: "'Inter', sans-serif" },
-                            color: '#1e293b',
-                            padding: 16,
-                            boxWidth: 16,
-                            boxHeight: 16
+        // 6. Donut Chart - Rekap % Temuan Ber-SAP Berdasarkan Asset Owner
+        const chart6Values = getValues(charts.tindak_lanjut || {});
+        const chart6Total  = chart6Values.reduce((a, b) => a + b, 0);
+        const chart6El     = document.getElementById('chart6');
+        const chart6EmptyEl= document.getElementById('chart6_empty');
+
+        // Warna teks kontras per warna irisan (gelap untuk warna terang, putih untuk warna gelap)
+        const chart6TextColor = (bgColor) => {
+            const lightBg = ['#FFC000', '#CBD5E1', '#9CA3AF'];
+            return lightBg.includes(bgColor) ? '#1e293b' : '#ffffff';
+        };
+
+        if (chart6Total === 0) {
+            if (chart6El) chart6El.classList.add('hidden');
+            if (chart6EmptyEl) chart6EmptyEl.classList.remove('hidden');
+        } else {
+            const chart6Labels = getLabels(charts.tindak_lanjut);
+            const chart6BgColors = getBgColors(chart6Labels);
+            new Chart(chart6El, {
+                type: 'doughnut',
+                plugins: [ChartDataLabels],
+                data: { 
+                    labels: chart6Labels, 
+                    datasets: [{ 
+                        data: chart6Values, 
+                        backgroundColor: chart6BgColors
+                    }] 
+                },
+                options: { 
+                    ...commonOptions, 
+                    plugins: { 
+                        legend: { 
+                            position: 'right',
+                            labels: {
+                                font: { size: 16, weight: 'bold', family: "'Inter', sans-serif" },
+                                color: '#1e293b',
+                                padding: 16,
+                                boxWidth: 16,
+                                boxHeight: 16
+                            }
+                        },
+                        tooltip: {
+                            titleFont: {
+                                size: 15,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            bodyFont: {
+                                size: 14,
+                                weight: 'bold',
+                                family: "'Inter', sans-serif"
+                            },
+                            padding: 12,
+                            callbacks: {
+                                label: function(ctx) {
+                                    return ` ${ctx.label}: ${ctx.raw}%`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            color: function(context) {
+                                return chart6TextColor(chart6BgColors[context.dataIndex] || '#9CA3AF');
+                            },
+                            font: { size: 15, weight: 'bold', family: "'Inter', sans-serif" },
+                            formatter: function(value) {
+                                return value >= 5 ? value + '%' : '';
+                            },
+                            anchor: 'center',
+                            align: 'center',
+                            display: function(context) {
+                                return context.dataset.data[context.dataIndex] >= 5;
+                            }
                         }
-                    },
-                    tooltip: {
-                        titleFont: {
-                            size: 15,
-                            weight: 'bold',
-                            family: "'Inter', sans-serif"
-                        },
-                        bodyFont: {
-                            size: 14,
-                            weight: 'bold',
-                            family: "'Inter', sans-serif"
-                        },
-                        padding: 12
-                    }
-                } 
-            }
-        });
+                    } 
+                }
+            });
+        }
 
         // Helper for Horizontal Bar charts with Data Labels (Percentages & Counts)
         // Urutan kategori mengikuti backend (PHP array order) — TIDAK di-sort by value.

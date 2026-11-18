@@ -83,9 +83,10 @@ class DashboardChartService
             'trending'          => $this->chartTrendingTemuan($fungsi, $pekaYear ?? $tahun),
             'kategori'          => $this->chartKategoriPeka($fungsi, $tahun),
             'keterlibatan'      => $this->chartKeterlibatan($fungsi, $koYear ?? $tahun, $koMonth ?? $bulan),
-            'persentase_fungsi' => $this->chartPersentaseFungsi($fungsi, $tahun),
-            'tindak_lanjut'     => $this->chartTindakLanjut($fungsi, $tahun),
-            'unsafe_action'     => $this->chartUnsafeAction($fungsi, $tahun),
+            'persentase_fungsi'    => $this->chartPersentaseFungsi($fungsi, $tahun),
+            'tindak_lanjut'        => $this->chartTindakLanjut($fungsi, $tahun),
+            'tindak_lanjut_counts' => $this->chartTindakLanjutCounts($fungsi, $tahun),
+            'unsafe_action'        => $this->chartUnsafeAction($fungsi, $tahun),
             'unsafe_condition'  => $this->chartUnsafeCondition($fungsi, $tahun),
         ];
     }
@@ -128,9 +129,10 @@ class DashboardChartService
             'trending'          => $this->chartTrendingTemuanYtd($fungsi, $tahun, $bulan),
             'kategori'          => $this->chartKategoriPekaYtd($fungsi, $tahun, $bulan),
             'keterlibatan'      => $this->chartKeterlibatan($fungsi, $tahun, $bulan),
-            'persentase_fungsi' => $this->chartPersentaseFungsiYtd($fungsi, $tahun, $bulan),
-            'tindak_lanjut'     => $this->chartTindakLanjutYtd($fungsi, $tahun, $bulan),
-            'unsafe_action'     => $this->chartUnsafeActionYtd($fungsi, $tahun, $bulan),
+            'persentase_fungsi'    => $this->chartPersentaseFungsiYtd($fungsi, $tahun, $bulan),
+            'tindak_lanjut'        => $this->chartTindakLanjutYtd($fungsi, $tahun, $bulan),
+            'tindak_lanjut_counts' => $this->chartTindakLanjutCountsYtd($fungsi, $tahun, $bulan),
+            'unsafe_action'        => $this->chartUnsafeActionYtd($fungsi, $tahun, $bulan),
             'unsafe_condition'  => $this->chartUnsafeConditionYtd($fungsi, $tahun, $bulan),
         ];
     }
@@ -280,36 +282,68 @@ class DashboardChartService
     }
 
     /**
-     * Chart 5 — Rekap Persentase Penindak Lanjut / SAP YTD khusus Executive Summary PDF.
+     * Chart 5 YTD — Rekap Persentase Temuan Ber-SAP Berdasarkan Asset Owner khusus Executive Summary PDF.
      */
     private function chartTindakLanjutYtd(?string $fungsi, int $tahun, int $bulan): array
     {
-        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        if ($fungsi) {
+            $totalFindings = $this->assetOwnerQuery($fungsi, $tahun, $bulan)->count();
 
-        $totalSap = $this->ytdQuery(null, $tahun, $bulan)
-            ->whereNotNull('no_notifikasi_sap')
-            ->where('no_notifikasi_sap', '!=', '')
-            ->count();
+            if ($totalFindings === 0) {
+                return [
+                    'Ber-SAP'       => 0,
+                    'Belum Ber-SAP' => 0,
+                ];
+            }
 
+            $countSap   = $this->applyValidSapFilter($this->assetOwnerQuery($fungsi, $tahun, $bulan))->count();
+            $countNoSap = max(0, $totalFindings - $countSap);
+
+            return self::largestRemainder([
+                'Ber-SAP'       => $countSap,
+                'Belum Ber-SAP' => $countNoSap,
+            ]);
+        }
+
+        $counts = [];
+        foreach (self::FUNGSI_LIST as $f) {
+            $counts[$f] = $this->applyValidSapFilter($this->assetOwnerQuery($f, $tahun, $bulan))->count();
+        }
+
+        $totalSap = array_sum($counts);
         if ($totalSap === 0) {
             $result = [];
-            foreach ($fungsiScope as $f) {
+            foreach (self::FUNGSI_LIST as $f) {
                 $result[$f] = 0;
             }
             return $result;
         }
 
-        $result = [];
-        foreach ($fungsiScope as $f) {
-            $count = $this->ytdQuery($f, $tahun, $bulan)
-                ->whereNotNull('no_notifikasi_sap')
-                ->where('no_notifikasi_sap', '!=', '')
-                ->count();
+        return self::largestRemainder($counts);
+    }
 
-            $result[$f] = round(($count / $totalSap) * 100);
+    /**
+     * Hitung jumlah temuan aktual YTD untuk Chart 5 Executive Summary PDF.
+     */
+    private function chartTindakLanjutCountsYtd(?string $fungsi, int $tahun, int $bulan): array
+    {
+        if ($fungsi) {
+            $totalFindings = $this->assetOwnerQuery($fungsi, $tahun, $bulan)->count();
+            $countSap      = $this->applyValidSapFilter($this->assetOwnerQuery($fungsi, $tahun, $bulan))->count();
+
+            return [
+                'Ber-SAP'       => $countSap,
+                'Belum Ber-SAP' => max(0, $totalFindings - $countSap),
+                'total'         => $totalFindings,
+            ];
         }
 
-        return $result;
+        $counts = [];
+        foreach (self::FUNGSI_LIST as $f) {
+            $counts[$f] = $this->applyValidSapFilter($this->assetOwnerQuery($f, $tahun, $bulan))->count();
+        }
+
+        return $counts;
     }
 
     /**
@@ -937,38 +971,82 @@ class DashboardChartService
     }
 
     /**
-     * Chart 6 — Rekap Persentase Penindak Lanjut / By SAP (Donut).
+     * Chart 6 — Rekap Persentase Temuan Ber-SAP Berdasarkan Asset Owner (Donut).
      *
-     * % distribusi finding ber-SAP per fungsi terhadap total ber-SAP dalam scope.
+     * Kasus Global ($fungsi === null):
+     *   Distribusi % temuan ber-SAP per fungsi (berdasarkan Asset Owner)
+     *   terhadap total seluruh temuan ber-SAP dari 4 fungsi utama.
+     *   Denominator = jumlah temuan ber-SAP dari 4 fungsi utama.
+     *   Data GM & unmapped tidak masuk ke denominator.
+     *   Menggunakan Largest Remainder Method sehingga total persis 100%.
+     *   Output: ['Operation' => %, 'Maintenance' => %, 'HSSE' => %, 'Business Support' => %]
+     *
+     * Kasus Dashboard Fungsi ($fungsi !== null):
+     *   Perbandingan % temuan Ber-SAP vs Belum Ber-SAP khusus fungsi terkait (berdasarkan Asset Owner).
+     *   Denominator = total temuan fungsi terkait (yang memiliki Asset Owner valid).
+     *   Numerator = temuan fungsi terkait yang memiliki No. SAP valid.
+     *   Output: ['Ber-SAP' => %, 'Belum Ber-SAP' => %]
      */
     private function chartTindakLanjut(?string $fungsi, ?int $tahun): array
     {
-        $fungsiScope = $fungsi ? [$fungsi] : self::FUNGSI_LIST;
+        if ($fungsi) {
+            $totalFindings = $this->assetOwnerQuery($fungsi, $tahun)->count();
 
-        $totalSap = $this->baseQuery(null, $tahun)
-            ->whereNotNull('no_notifikasi_sap')
-            ->where('no_notifikasi_sap', '!=', '')
-            ->count();
+            if ($totalFindings === 0) {
+                return [
+                    'Ber-SAP'       => 0,
+                    'Belum Ber-SAP' => 0,
+                ];
+            }
 
+            $countSap   = $this->applyValidSapFilter($this->assetOwnerQuery($fungsi, $tahun))->count();
+            $countNoSap = max(0, $totalFindings - $countSap);
+
+            return self::largestRemainder([
+                'Ber-SAP'       => $countSap,
+                'Belum Ber-SAP' => $countNoSap,
+            ]);
+        }
+
+        $counts = [];
+        foreach (self::FUNGSI_LIST as $f) {
+            $counts[$f] = $this->applyValidSapFilter($this->assetOwnerQuery($f, $tahun))->count();
+        }
+
+        $totalSap = array_sum($counts);
         if ($totalSap === 0) {
             $result = [];
-            foreach ($fungsiScope as $f) {
+            foreach (self::FUNGSI_LIST as $f) {
                 $result[$f] = 0;
             }
             return $result;
         }
 
-        $result = [];
-        foreach ($fungsiScope as $f) {
-            $count = $this->baseQuery($f, $tahun)
-                ->whereNotNull('no_notifikasi_sap')
-                ->where('no_notifikasi_sap', '!=', '')
-                ->count();
+        return self::largestRemainder($counts);
+    }
 
-            $result[$f] = round(($count / $totalSap) * 100);
+    /**
+     * Hitung jumlah temuan aktual untuk Chart 6 (untuk keperluan narasi PDF & tooltip).
+     */
+    private function chartTindakLanjutCounts(?string $fungsi, ?int $tahun): array
+    {
+        if ($fungsi) {
+            $totalFindings = $this->assetOwnerQuery($fungsi, $tahun)->count();
+            $countSap      = $this->applyValidSapFilter($this->assetOwnerQuery($fungsi, $tahun))->count();
+
+            return [
+                'Ber-SAP'       => $countSap,
+                'Belum Ber-SAP' => max(0, $totalFindings - $countSap),
+                'total'         => $totalFindings,
+            ];
         }
 
-        return $result;
+        $counts = [];
+        foreach (self::FUNGSI_LIST as $f) {
+            $counts[$f] = $this->applyValidSapFilter($this->assetOwnerQuery($f, $tahun))->count();
+        }
+
+        return $counts;
     }
 
     /**
@@ -1469,9 +1547,9 @@ class DashboardChartService
     }
 
     /**
-     * Asset Owner Query — khusus untuk Chart 5 (Rekap Persentase Temuan per Fungsi).
+     * Asset Owner Query — untuk Chart 5 (Rekap Persentase Temuan) dan Chart 6 (Temuan Ber-SAP).
      *
-     * Berdasarkan arahan final mentor:
+     * Berdasarkan arahan final mentor & keputusan bisnis:
      * - Pengelompokan temuan berdasarkan Asset Owner (bukan fungsi pelapor).
      * - Temuan yang belum memiliki Asset Owner (kosong, NULL, whitespace) dikecualikan.
      * - Temuan baru masuk ke perhitungan setelah Asset Owner-nya terisi.
@@ -1481,9 +1559,10 @@ class DashboardChartService
      *
      * @param  string   $fungsi  Salah satu dari 4 fungsi utama (Operation, Maintenance, HSSE, Business Support)
      * @param  int|null $tahun   Filter tahun dari JSON data_sipeka->tanggal
+     * @param  int|null $bulan   Filter bulan cutoff (1-12) untuk mode YTD
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    private function assetOwnerQuery(string $fungsi, ?int $tahun = null)
+    private function assetOwnerQuery(string $fungsi, ?int $tahun = null, ?int $bulan = null)
     {
         $query = SipekaFinding::query();
 
@@ -1504,8 +1583,20 @@ class DashboardChartService
             $query->whereRaw('1 = 0');
         }
 
-        if ($tahun) {
-            $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+        $tanggalCol = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+
+        if ($tahun && $bulan) {
+            // Filter YTD: Januari (01) s/d bulan terpilih
+            $startDate = "{$tahun}-01-01 00:00";
+            $endPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+            $lastDay   = date('t', mktime(0, 0, 0, $bulan, 1, $tahun));
+            $endDate   = "{$tahun}-{$endPadded}-{$lastDay} 23:59";
+
+            $query->whereRaw(
+                "STR_TO_DATE({$tanggalCol}, '%Y-%m-%d %H:%i') BETWEEN ? AND ?",
+                [$startDate, $endDate]
+            );
+        } elseif ($tahun) {
             $query->whereRaw(
                 "{$tanggalCol} LIKE ?",
                 ["%{$tahun}%"]
@@ -1513,5 +1604,60 @@ class DashboardChartService
         }
 
         return $query;
+    }
+
+    /**
+     * Terapkan filter nomor notifikasi SAP yang valid pada query.
+     * Mengabaikan NULL, string kosong, whitespace-only, '-', '0', dan 'null'.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function applyValidSapFilter($query)
+    {
+        return $query->whereNotNull('no_notifikasi_sap')
+            ->whereRaw("TRIM(no_notifikasi_sap) NOT IN ('', '-', '0', 'null', 'NULL')");
+    }
+
+    /**
+     * Membulatkan array persentase ke bilangan bulat dengan total tepat 100%
+     * menggunakan Largest Remainder Method (Metode Hamilton).
+     *
+     * @param  array<string, int> $counts  [Label => count]
+     * @return array<string, int>          [Label => persentase bulat (total 100)]
+     */
+    public static function largestRemainder(array $counts): array
+    {
+        $total = array_sum($counts);
+        if ($total <= 0) {
+            return array_fill_keys(array_keys($counts), 0);
+        }
+
+        $floored = [];
+        $remainders = [];
+        $currentSum = 0;
+
+        foreach ($counts as $key => $count) {
+            $exact = ($count / $total) * 100;
+            $floor = (int) floor($exact);
+            $floored[$key] = $floor;
+            $remainders[$key] = $exact - $floor;
+            $currentSum += $floor;
+        }
+
+        $diff = 100 - $currentSum;
+
+        // Urutkan berdasarkan sisa (remainder) terbesar; jika sama, pertahankan urutan
+        arsort($remainders);
+
+        foreach (array_keys($remainders) as $key) {
+            if ($diff <= 0) {
+                break;
+            }
+            $floored[$key]++;
+            $diff--;
+        }
+
+        return $floored;
     }
 }

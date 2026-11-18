@@ -121,21 +121,30 @@ class ExecutiveSummaryPdfService
         }
         $s4 = "% Closing Temuan Aset Owner terbanyak di Fungsi {$maxCloseFungsi} (" . number_format($maxClosePct, 1, ',', '.') . "%)";
 
-        // Section 5: Rekap % Penindak Lanjut
-        $tl = $charts['tindak_lanjut'] ?? [];
-        $tlTotal = array_sum($tl);
-        if ($tlTotal === 0) {
-            $s5 = "Dari sisi jumlah tindak lanjut, belum ada temuan berstatus SAP untuk periode ini.";
+        // Section 5: Rekap % Temuan Ber-SAP Berdasarkan Asset Owner
+        $tlPct        = $charts['tindak_lanjut'] ?? [];
+        $tlCounts     = $charts['tindak_lanjut_counts'] ?? [];
+        $tlTotalCount = array_sum($tlCounts);
+
+        if ($tlTotalCount === 0) {
+            $s5 = "Berdasarkan Asset Owner, belum ada temuan berstatus SAP valid untuk periode ini.";
         } else {
-            arsort($tl);
-            $topFungsi = array_slice($tl, 0, 2, true);
-            $top1Name = array_keys($topFungsi)[0] ?? '-';
-            $top1Val = $topFungsi[$top1Name] ?? 0;
-            $top1Pct = round(($top1Val / $tlTotal) * 100);
-            $top2Name = array_keys($topFungsi)[1] ?? '-';
-            $top2Val = $topFungsi[$top2Name] ?? 0;
-            $top2Pct = round(($top2Val / $tlTotal) * 100);
-            $s5 = "Dari sisi jumlah tindak lanjut, Fungsi {$top1Name} terbanyak melakukan tindak lanjut dengan {$top1Val} laporan ({$top1Pct}%) dan {$top2Name} dengan {$top2Val} laporan ({$top2Pct}%)";
+            // Urutkan berdasarkan jumlah laporan aktual terbanyak
+            arsort($tlCounts);
+            $topFungsi  = array_slice($tlCounts, 0, 2, true);
+            $top1Name   = array_keys($topFungsi)[0] ?? '-';
+            $top1Count  = $topFungsi[$top1Name] ?? 0;
+            $top1Pct    = $tlPct[$top1Name] ?? ($tlTotalCount > 0 ? round(($top1Count / $tlTotalCount) * 100) : 0);
+
+            $top2Name   = array_keys($topFungsi)[1] ?? '-';
+            $top2Count  = $topFungsi[$top2Name] ?? 0;
+            $top2Pct    = $tlPct[$top2Name] ?? ($tlTotalCount > 0 ? round(($top2Count / $tlTotalCount) * 100) : 0);
+
+            if (count($topFungsi) > 1 && $top2Count > 0) {
+                $s5 = "Berdasarkan Asset Owner, Fungsi {$top1Name} memiliki temuan ber-SAP terbanyak dengan {$top1Count} laporan ({$top1Pct}%) dan {$top2Name} dengan {$top2Count} laporan ({$top2Pct}%).";
+            } else {
+                $s5 = "Berdasarkan Asset Owner, Fungsi {$top1Name} memiliki temuan ber-SAP terbanyak dengan {$top1Count} laporan ({$top1Pct}%).";
+            }
         }
 
         // Section 6: Keterlibatan
@@ -550,7 +559,7 @@ class ExecutiveSummaryPdfService
         ];
 
         // -------------------------------------------------------------
-        // Chart 5: Rekap % Penindak Lanjut (Donut Chart with outlabels)
+        // Chart 5: Rekap % Temuan Ber-SAP Berdasarkan Asset Owner (Donut Chart with outlabels)
         // -------------------------------------------------------------
         $tl = $charts['tindak_lanjut'] ?? [];
         $tlTotal = array_sum($tl);
