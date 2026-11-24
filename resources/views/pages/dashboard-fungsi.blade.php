@@ -69,7 +69,7 @@
                     <input type="hidden" name="rr_month" value="{{ request('rr_month') }}">
                 @endif
 
-                <select name="year" onchange="this.form.submit()"
+                <select name="year" id="filter-year"
                     class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
                     <option value="">Semua Tahun</option>
                     @foreach($tahunList as $yr)
@@ -77,7 +77,20 @@
                     @endforeach
                 </select>
 
-                @if($selectedYear || request('search') || request('status_filter') || request('date_filter'))
+                <select name="month" id="filter-month"
+                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
+                    <option value="">Semua Bulan</option>
+                    @foreach($bulanNamaList as $num => $nama)
+                        <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                    @endforeach
+                </select>
+
+                <div id="filter-loading-indicator" class="hidden flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl animate-pulse">
+                    <svg class="animate-spin w-3.5 h-3.5 text-[#9DBF2A]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                    <span>Memuat...</span>
+                </div>
+
+                @if($selectedYear || $selectedMonth || request('search') || request('status_filter') || request('date_filter'))
                     @php
                         $resetHeaderQuery = request()->only(['rr_year', 'rr_month', 'ko_year', 'ko_month']);
                     @endphp
@@ -88,20 +101,39 @@
             {{-- Global Tab Top Filter --}}
             @php
                 $tahunList = range(now()->year + 1, 2020);
+                $bulanNamaList = [
+                    1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April',
+                    5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus',
+                    9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
+                ];
             @endphp
-            <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+            <form action="" method="GET" onsubmit="return false;" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="tab" value="global">
-                @foreach(request()->except(['g_year', 'tab']) as $k => $v)
+                @foreach(request()->except(['g_year', 'g_month', 'tab']) as $k => $v)
                     <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                 @endforeach
-                <select name="g_year" onchange="this.form.submit()"
+                <select name="g_year" id="g-filter-year"
                     class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
                     <option value="">Semua Tahun (Global)</option>
                     @foreach($tahunList as $yr)
                         <option value="{{ $yr }}" {{ ($gYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                     @endforeach
                 </select>
-                @if(request()->has('g_year') || request()->has('g_rr_year') || request()->has('g_rr_month') || request()->has('g_ko_year') || request()->has('g_ko_month') || request()->has('g_peka_year'))
+
+                <select name="g_month" id="g-filter-month"
+                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
+                    <option value="">Semua Bulan (Global)</option>
+                    @foreach($bulanNamaList as $num => $nama)
+                        <option value="{{ $num }}" {{ ($gMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                    @endforeach
+                </select>
+
+                <div id="g-filter-loading-indicator" class="hidden flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl animate-pulse">
+                    <svg class="animate-spin w-3.5 h-3.5 text-[#9DBF2A]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                    <span>Memuat...</span>
+                </div>
+
+                @if(request()->has('g_year') || request()->has('g_month') || request()->has('g_rr_year') || request()->has('g_rr_month') || request()->has('g_ko_year') || request()->has('g_ko_month') || request()->has('g_peka_year'))
                     <a href="{{ request()->url() }}?tab=global" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter Global</a>
                 @endif
             </form>
@@ -148,7 +180,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Total Temuan</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['total'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="kpi-total">{{ number_format($kpi['total'] ?? 0) }}</h3>
                 <div class="mt-2 flex items-center text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full w-fit">
                     Keseluruhan Data
                 </div>
@@ -162,7 +194,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Status Open</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['open'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="kpi-open">{{ number_format($kpi['open'] ?? 0) }}</h3>
                 <div class="mt-2 flex items-center text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full w-fit">
                     Butuh Tindak Lanjut
                 </div>
@@ -176,7 +208,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Status Closed</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['closed'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="kpi-closed">{{ number_format($kpi['closed'] ?? 0) }}</h3>
                 <div class="mt-2 flex items-center text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full w-fit">
                     Telah Diselesaikan
                 </div>
@@ -220,8 +252,8 @@
             {{-- Header: Judul + Filter Mandiri In-Card --}}
             <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
                 <div>
-                    <h3 class="text-[22px] font-bold text-slate-800">{{ $rrLabel }}</h3>
-                    <p class="text-xs text-slate-400 mt-0.5 font-mono">
+                    <h3 class="text-[22px] font-bold text-slate-800" id="chart2-title">{{ $rrLabel }}</h3>
+                    <p class="text-xs text-slate-400 mt-0.5 font-mono" id="chart2-subtitle">
                         @if($rrMode === 'manpower_rasio')
                             temuan YTD ÷ (manpower × bulan)
                         @else
@@ -231,7 +263,7 @@
                 </div>
 
                 {{-- Filter Khusus Card 2: Tahun & Bulan Mandiri --}}
-                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+                <form action="" method="GET" onsubmit="return false;" class="flex flex-wrap items-center gap-2">
                     {{-- Pertahankan filter existing halaman (search, status, date, sort, dll) --}}
                     @if(request('search'))
                         <input type="hidden" name="search" value="{{ request('search') }}">
@@ -260,8 +292,10 @@
                     @endif
 
                     <select name="rr_year" id="rr-year-filter"
-                        onchange="this.form.submit()"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        @if(!$latestDataYear)
+                            <option value="">Semua Tahun</option>
+                        @endif
                         @foreach($tahunList as $yr)
                             <option value="{{ $yr }}" {{ $rrYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                         @endforeach
@@ -274,7 +308,6 @@
                             : $bulanNamaList;
                     @endphp
                     <select name="rr_month" id="rr-month-filter"
-                        onchange="this.form.submit()"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
                         <option value="">Semua Bulan</option>
                         @foreach($card2BulanList as $num => $nama)
@@ -292,36 +325,33 @@
                 </form>
             </div>
 
-            {{-- Notice State Server-side --}}
-            @if($rrStatus === 'no_sipeka')
-                <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    ⚠️ Data temuan SIPEKA untuk fungsi <strong>{{ $fungsi }}</strong> pada periode <strong>{{ ($rrMonth && isset($bulanNamaList[$rrMonth]) ? $bulanNamaList[$rrMonth] . ' ' : '') . $rrYear }}</strong> belum tersedia.
+            {{-- Notice State --}}
+            <div id="chart2_notice_container" class="{{ in_array($rrStatus, ['no_sipeka', 'no_manpower']) ? '' : 'hidden' }} mb-3">
+                <div id="chart2_notice" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    @if($rrStatus === 'no_manpower')
+                        ⚠️ Data manpower untuk fungsi <strong>{{ $fungsi }}</strong> pada periode <strong>{{ ($rrMonth && isset($bulanNamaList[$rrMonth]) ? $bulanNamaList[$rrMonth] . ' ' : '') . $rrYear }}</strong> belum tersedia. Reporting Rate belum dapat dihitung.
+                    @else
+                        ⚠️ Data temuan SIPEKA untuk fungsi <strong>{{ $fungsi }}</strong> pada periode <strong>{{ ($rrMonth && isset($bulanNamaList[$rrMonth]) ? $bulanNamaList[$rrMonth] . ' ' : '') . $rrYear }}</strong> belum tersedia.
+                    @endif
                 </div>
-            @elseif($rrStatus === 'no_manpower')
-                <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    ⚠️ Data manpower untuk fungsi <strong>{{ $fungsi }}</strong> pada periode <strong>{{ ($rrMonth && isset($bulanNamaList[$rrMonth]) ? $bulanNamaList[$rrMonth] . ' ' : '') . $rrYear }}</strong> belum tersedia. Reporting Rate belum dapat dihitung.
-                </div>
-            @endif
+            </div>
 
-            @if($rrStatus === 'no_sipeka' || $rrStatus === 'no_manpower')
-                <div class="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 min-h-[220px]">
+            <div class="flex-1 relative w-full h-full min-h-0 flex items-center justify-center">
+                <canvas id="chart2" class="w-full h-full {{ in_array($rrStatus, ['no_sipeka', 'no_manpower']) ? 'hidden' : '' }}"></canvas>
+                <div id="chart2_empty" class="{{ in_array($rrStatus, ['no_sipeka', 'no_manpower']) ? '' : 'hidden' }} flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 min-h-[220px]">
                     <svg class="w-12 h-12 mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
                     <p class="text-sm font-medium text-slate-500">Grafik tidak dapat ditampilkan</p>
-                    <p class="text-xs text-slate-400 mt-1">
-                        @if($rrStatus === 'no_sipeka')
-                            Data temuan SIPEKA untuk periode ini belum tersedia.
-                        @else
+                    <p id="chart2_empty_msg" class="text-xs text-slate-400 mt-1">
+                        @if($rrStatus === 'no_manpower')
                             Data manpower untuk periode ini belum tersedia.
+                        @else
+                            Data temuan SIPEKA untuk periode ini belum tersedia.
                         @endif
                     </p>
                 </div>
-            @else
-                <div class="flex-1 relative w-full h-full min-h-0">
-                    <canvas id="chart2"></canvas>
-                </div>
-            @endif
+            </div>
         </div>
 
         <!-- Chart 3: Kategori PEKA (Pie) -->
@@ -350,10 +380,14 @@
                 <div>
                     <h3 class="text-[22px] font-bold text-slate-800 flex flex-wrap items-center gap-2">
                         <span>4. Keterlibatan dalam Observasi</span>
-                        <span class="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100" title="Klik bar segmen Belum Melapor untuk melihat daftar personil">
-                            <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
-                            Klik bar untuk daftar personil
-                        </span>
+                        <button type="button" onclick="window.openReportedModal && window.openReportedModal('{{ $fungsi }}')" class="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200 transition" title="Daftar personil yang sudah melapor">
+                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Sudah Melapor
+                        </button>
+                        <button type="button" onclick="window.openUnreportedModal && window.openUnreportedModal('{{ $fungsi }}')" class="inline-flex items-center gap-1 text-[11px] text-red-700 font-medium bg-red-50 hover:bg-red-100 px-2.5 py-0.5 rounded-full border border-red-200 transition" title="Daftar personil yang belum melapor">
+                            <svg class="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Belum Melapor
+                        </button>
                     </h3>
                     <p class="text-xs text-slate-400 mt-0.5">
                         @if($koStatus === 'ok' && $koMonth && isset($bulanNamaList[$koMonth]))
@@ -365,7 +399,7 @@
                 </div>
 
                 {{-- Filter Khusus Card 4: Tahun & Bulan Mandiri --}}
-                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+                <form action="" method="GET" onsubmit="return false;" class="flex flex-wrap items-center gap-2">
                     {{-- Pertahankan filter existing halaman (search, status, date, dll) --}}
                     @if(request('search'))
                         <input type="hidden" name="search" value="{{ request('search') }}">
@@ -394,15 +428,16 @@
                     @endif
 
                     <select name="ko_year" id="ko-year-filter"
-                        onchange="this.form.submit()"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        @if(!$latestDataYear)
+                            <option value="">Semua Tahun</option>
+                        @endif
                         @foreach($tahunList as $yr)
                             <option value="{{ $yr }}" {{ $koYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                         @endforeach
                     </select>
 
                     <select name="ko_month" id="ko-month-filter"
-                        onchange="this.form.submit()"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
                         <option value="">Semua Bulan</option>
                         @foreach($bulanNamaList as $num => $nama)
@@ -477,7 +512,7 @@
                     <canvas id="chart6" style="max-width: 210px; max-height: 210px;"></canvas>
                     {{-- Nilai Persentase Tepat di Tengah Donut --}}
                     <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span class="text-4xl sm:text-5xl font-black tracking-tight" style="color: {{ $currentColor['hex'] }}">
+                        <span id="chart6-center-pct" class="text-4xl sm:text-5xl font-black tracking-tight" style="color: {{ $currentColor['hex'] }}">
                             {{ $fungsiSapPct }}%
                         </span>
                     </div>
@@ -710,7 +745,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Total Temuan (Semua Fungsi)</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($globalKpi['total'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="g-kpi-total">{{ number_format($globalKpi['total'] ?? 0) }}</h3>
                 <div class="mt-2 flex items-center text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full w-fit">
                     Keseluruhan Data
                 </div>
@@ -723,7 +758,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Status Open (Semua Fungsi)</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($globalKpi['open'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="g-kpi-open">{{ number_format($globalKpi['open'] ?? 0) }}</h3>
                 <div class="mt-2 flex items-center text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full w-fit">
                     Butuh Tindak Lanjut
                 </div>
@@ -736,7 +771,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Status Closed (Semua Fungsi)</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($globalKpi['closed'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="g-kpi-closed">{{ number_format($globalKpi['closed'] ?? 0) }}</h3>
                 <div class="mt-2 flex items-center text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full w-fit">
                     Telah Diselesaikan
                 </div>
@@ -836,20 +871,23 @@
 
             <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
                 <div>
-                    <h3 class="text-[22px] font-bold text-slate-800">{{ $gRrLabel }}</h3>
-                    <p class="text-xs text-slate-400 mt-0.5 font-mono">
+                    <h3 class="text-[22px] font-bold text-slate-800" id="g-chart2-title">{{ $gRrLabel }}</h3>
+                    <p class="text-xs text-slate-400 mt-0.5 font-mono" id="g-chart2-subtitle">
                         @if($gRrMode === 'manpower_rasio') temuan YTD ÷ (manpower × bulan)
                         @else jumlah pelaporan ÷ manpower tahunan @endif
                     </p>
                 </div>
                 {{-- Filter Khusus G-Chart 2 --}}
-                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+                <form action="" method="GET" onsubmit="return false;" class="flex flex-wrap items-center gap-2">
                     <input type="hidden" name="tab" value="global">
                     @foreach(request()->except(['g_rr_year','g_rr_month','tab']) as $k => $v)
                         <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                     @endforeach
-                    <select name="g_rr_year" onchange="this.form.submit()"
+                    <select name="g_rr_year" id="g-rr-year-filter"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        @if(!$latestDataYear)
+                            <option value="">Semua Tahun</option>
+                        @endif
                         @foreach($tahunList as $yr)
                             <option value="{{ $yr }}" {{ $gRrYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                         @endforeach
@@ -859,7 +897,7 @@
                             ? array_filter($bulanNamaList, fn($num) => $num <= $gRrMaxBulan, ARRAY_FILTER_USE_KEY)
                             : $bulanNamaList;
                     @endphp
-                    <select name="g_rr_month" onchange="this.form.submit()"
+                    <select name="g_rr_month" id="g-rr-month-filter"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
                         <option value="">Semua Bulan</option>
                         @foreach($gCard2BulanList as $num => $nama)
@@ -876,20 +914,20 @@
                 </form>
             </div>
 
-            @if($gRrStatus === 'no_sipeka')
-                <div class="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <div id="g_chart2_notice_container" class="{{ $gRrStatus === 'no_sipeka' ? '' : 'hidden' }} mb-3">
+                <div id="g_chart2_notice" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                     ⚠️ Data temuan SIPEKA pada periode <strong>{{ ($gRrMonth && isset($bulanNamaList[$gRrMonth]) ? $bulanNamaList[$gRrMonth] . ' ' : '') . $gRrYear }}</strong> belum tersedia.
                 </div>
-                <div class="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 min-h-[220px]">
+            </div>
+
+            <div class="flex-1 relative w-full h-full min-h-0 flex items-center justify-center">
+                <canvas id="g_chart2" class="w-full h-full {{ $gRrStatus === 'no_sipeka' ? 'hidden' : '' }}"></canvas>
+                <div id="g_chart2_empty" class="{{ $gRrStatus === 'no_sipeka' ? '' : 'hidden' }} flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 min-h-[220px]">
                     <svg class="w-12 h-12 mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     <p class="text-sm font-medium text-slate-500">Grafik tidak dapat ditampilkan</p>
-                    <p class="text-xs text-slate-400 mt-1">Data temuan SIPEKA untuk periode ini belum tersedia.</p>
+                    <p id="g_chart2_empty_msg" class="text-xs text-slate-400 mt-1">Data temuan SIPEKA untuk periode ini belum tersedia.</p>
                 </div>
-            @else
-                <div class="flex-1 relative w-full h-full min-h-0">
-                    <canvas id="g_chart2"></canvas>
-                </div>
-            @endif
+            </div>
         </div>
 
         {{-- G-Chart Trending: Rekap PEKA Bulanan (Full Width) --}}
@@ -905,15 +943,18 @@
                             <p class="text-sm text-slate-500">Jumlah temuan berdasarkan kategori dan tren bulanan seluruh fungsi</p>
                         </div>
                     </div>
-                    <form action="" method="GET" class="flex items-center gap-2">
+                    <form action="" method="GET" onsubmit="return false;" class="flex items-center gap-2">
                         <input type="hidden" name="tab" value="global">
                         @foreach(request()->except(['g_peka_year','tab']) as $k => $v)
                             <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                         @endforeach
-                        <select name="g_peka_year" onchange="this.form.submit()"
+                        <select name="g_peka_year" id="g-peka-year-filter"
                             class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                            @if(!$latestDataYear)
+                                <option value="">Semua Tahun</option>
+                            @endif
                             @foreach($tahunList as $yr)
-                                <option value="{{ $yr }}" {{ ($gPekaYear ?? now()->year) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                                <option value="{{ $yr }}" {{ ($gPekaYear ?? $latestDataYear) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                             @endforeach
                         </select>
                     </form>
@@ -1003,10 +1044,13 @@
                 <div class="space-y-1">
                     <div class="flex flex-wrap items-center gap-2">
                         <h3 class="text-[22px] font-bold text-slate-800">4. Keterlibatan dalam Observasi</h3>
-                        <span class="inline-flex items-center gap-1 text-[11px] text-blue-600 font-medium bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100" title="Klik bar segmen Belum Melapor untuk melihat daftar personil">
-                            <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
-                            Klik bar untuk daftar personil
-                        </span>
+                        <button type="button" id="btn-reported-all"
+                                onclick="window.openReportedModal && window.openReportedModal('all')"
+                                class="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200 transition"
+                                title="Daftar Sudah Melapor untuk seluruh 4 fungsi utama">
+                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Daftar sudah melapor — semua fungsi
+                        </button>
                         <button type="button"
                                 onclick="window.openUnreportedModal && window.openUnreportedModal('all')"
                                 class="inline-flex items-center gap-1 text-[11px] text-slate-600 font-medium bg-slate-50 hover:bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 transition"
@@ -1016,18 +1060,21 @@
                     </div>
                     <p class="text-xs text-slate-400">Rumus: Pelapor unik Jan s/d bulan terpilih &divide; Manpower bulan terpilih &times; 100%</p>
                 </div>
-                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
+                <form action="" method="GET" onsubmit="return false;" class="flex flex-wrap items-center gap-2">
                     <input type="hidden" name="tab" value="global">
                     @foreach(request()->except(['g_ko_year','g_ko_month','tab']) as $k => $v)
                         <input type="hidden" name="{{ $k }}" value="{{ $v }}">
                     @endforeach
-                    <select name="g_ko_year" onchange="this.form.submit()"
+                    <select name="g_ko_year" id="g-ko-year-filter"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
+                        @if(!$latestDataYear)
+                            <option value="">Semua Tahun</option>
+                        @endif
                         @foreach($tahunList as $yr)
                             <option value="{{ $yr }}" {{ $gKoYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                         @endforeach
                     </select>
-                    <select name="g_ko_month" onchange="this.form.submit()"
+                    <select name="g_ko_month" id="g-ko-month-filter"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
                         <option value="">Semua Bulan</option>
                         @foreach($bulanNamaList as $num => $nama)
@@ -1117,6 +1164,8 @@
 
 {{-- Modal Daftar Belum Melapor --}}
 @include('components.unreported-modal')
+{{-- Modal Daftar Sudah Melapor --}}
+@include('components.reported-modal')
 
 <!-- Update Modal -->
 <div id="updateModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center">
@@ -1192,10 +1241,28 @@
 
 @if($activeTab === 'fungsi')
 <script>
+    window.chartInstances = window.chartInstances || {};
+
+    function getOrCreateChart(canvasId, config) {
+        if (window.chartInstances[canvasId]) {
+            try {
+                window.chartInstances[canvasId].destroy();
+            } catch(e) {
+                console.warn('Error destroying chart ' + canvasId, e);
+            }
+            delete window.chartInstances[canvasId];
+        }
+        const canvas = typeof canvasId === 'string' ? document.getElementById(canvasId) : canvasId;
+        if (!canvas) return null;
+        const idKey = canvas.id || canvasId;
+        const chart = new Chart(canvas, config);
+        window.chartInstances[idKey] = chart;
+        return chart;
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-        const charts = @json($charts ?? []);
-        const globalCharts = @json($globalCharts ?? []);
-        if(Object.keys(charts).length === 0) return;
+        const initialCharts = @json($charts ?? []);
+        const initialGlobalCharts = @json($globalCharts ?? []);
 
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#64748B';
@@ -1215,29 +1282,31 @@
             'Belum Ber-SAP': '#CBD5E1',
         };
 
-        // Helper to get array of values and labels from assoc array
-        const getLabels = (obj) => Object.keys(obj);
-        const getValues = (obj) => Object.values(obj);
+        const getLabels = (obj) => Object.keys(obj || {});
+        const getValues = (obj) => Object.values(obj || {});
         const getBgColors = (keys) => keys.map(k => colors[k] || '#9CA3AF');
 
-        // 1. Pie Chart - % PEKA Per Fungsi
-        const chart1Labels = getLabels(charts.fungsi);
-        const chart1Values = getValues(charts.fungsi);
-        const chart1Total = chart1Values.reduce((a, b) => a + b, 0);
+        window.renderAllTab1Charts = function(charts, globalCharts, dataExtra = {}) {
+            if (!charts || Object.keys(charts).length === 0) return;
 
-        new Chart(document.getElementById('chart1'), {
-            type: 'pie',
-            plugins: [ChartDataLabels],
-            data: { 
-                labels: chart1Labels, 
-                datasets: [{ 
-                    data: chart1Values, 
-                    backgroundColor: getBgColors(chart1Labels),
-                    borderWidth: 2,
-                    borderColor: '#fff',
-                }] 
-            },
-            options: { 
+            // 1. Pie Chart - % PEKA Per Fungsi
+            const chart1Labels = getLabels(charts.fungsi);
+            const chart1Values = getValues(charts.fungsi);
+            const chart1Total = chart1Values.reduce((a, b) => a + b, 0);
+
+            getOrCreateChart('chart1', {
+                type: 'pie',
+                plugins: [ChartDataLabels],
+                data: { 
+                    labels: chart1Labels, 
+                    datasets: [{ 
+                        data: chart1Values, 
+                        backgroundColor: getBgColors(chart1Labels),
+                        borderWidth: 2,
+                        borderColor: '#fff',
+                    }] 
+                },
+                options: { 
                 ...commonOptions, 
                 plugins: { 
                     legend: { 
@@ -1311,90 +1380,131 @@
         };
         const rrBgColors = rrLabels.map(l => rrColorMap[l] || '#9CA3AF');
 
-        const chart2El = document.getElementById('chart2');
-        if (chart2El && rrLabels.length > 0) {
-            new Chart(chart2El, {
-                type: 'bar',
-                data: { 
-                    labels: rrLabels, 
-                    datasets: [{ data: rrValues, backgroundColor: rrBgColors, borderRadius: 4 }] 
-                },
-                plugins: [
-                    {
-                        id: 'rrValueLabels',
-                        afterDatasetsDraw(chartInstance) {
-                            const ctx = chartInstance.ctx;
-                            ctx.save();
-                            ctx.font = "bold 14px 'Inter', sans-serif";
-                            ctx.textAlign = 'left';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillStyle = '#1e293b';
+        const chart2El         = document.getElementById('chart2');
+        const chart2EmptyEl    = document.getElementById('chart2_empty');
+        const chart2EmptyMsg   = document.getElementById('chart2_empty_msg');
+        const chart2NoticeCont = document.getElementById('chart2_notice_container');
+        const chart2Notice     = document.getElementById('chart2_notice');
 
-                            chartInstance.data.datasets.forEach(function (dataset, i) {
-                                const meta = chartInstance.getDatasetMeta(i);
-                                meta.data.forEach(function (bar, index) {
-                                    const data = dataset.data[index];
-                                    if (data !== null && data !== undefined) {
-                                        ctx.fillText(data, bar.x + 8, bar.y);
-                                    }
-                                });
-                            });
-                            ctx.restore();
-                        }
-                    }
-                ],
-                options: { 
-                    ...commonOptions, 
-                    indexAxis: 'y', 
-                    layout: {
-                        padding: {
-                            right: 60
-                        }
+        const currentRrStatus  = (dataExtra && dataExtra.rrStatus) ? dataExtra.rrStatus : '{{ $rrStatus }}';
+        const isRrEmpty        = rrLabels.length === 0 || currentRrStatus === 'no_sipeka' || currentRrStatus === 'no_manpower';
+
+        if (isRrEmpty) {
+            if (chart2El) chart2El.classList.add('hidden');
+            if (chart2EmptyEl) chart2EmptyEl.classList.remove('hidden');
+            if (chart2NoticeCont) chart2NoticeCont.classList.remove('hidden');
+            if (chart2EmptyMsg) {
+                chart2EmptyMsg.textContent = (currentRrStatus === 'no_manpower')
+                    ? 'Data manpower untuk periode ini belum tersedia.'
+                    : 'Data temuan SIPEKA untuk periode ini belum tersedia.';
+            }
+            if (chart2Notice && dataExtra && dataExtra.rrYear) {
+                const yr = dataExtra.rrYear || '';
+                const mo = dataExtra.rrMonth;
+                const bNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                const moText = mo && bNama[mo] ? bNama[mo] + ' ' : '';
+                const fName = dataExtra.fungsi || '{{ $fungsi }}';
+                if (currentRrStatus === 'no_manpower') {
+                    chart2Notice.innerHTML = `⚠️ Data manpower untuk fungsi <strong>${fName}</strong> pada periode <strong>${moText}${yr}</strong> belum tersedia. Reporting Rate belum dapat dihitung.`;
+                } else {
+                    chart2Notice.innerHTML = `⚠️ Data temuan SIPEKA untuk fungsi <strong>${fName}</strong> pada periode <strong>${moText}${yr}</strong> belum tersedia.`;
+                }
+            }
+            if (window.chartInstances && window.chartInstances['chart2']) {
+                try {
+                    window.chartInstances['chart2'].destroy();
+                } catch(e) {}
+                delete window.chartInstances['chart2'];
+            }
+        } else {
+            if (chart2El) chart2El.classList.remove('hidden');
+            if (chart2EmptyEl) chart2EmptyEl.classList.add('hidden');
+            if (chart2NoticeCont) chart2NoticeCont.classList.add('hidden');
+
+            if (chart2El) {
+                getOrCreateChart('chart2', {
+                    type: 'bar',
+                    data: { 
+                        labels: rrLabels, 
+                        datasets: [{ data: rrValues, backgroundColor: rrBgColors, borderRadius: 4 }] 
                     },
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            titleFont: {
-                                size: 15,
-                                weight: 'bold',
-                                family: "'Inter', sans-serif"
+                    plugins: [
+                        {
+                            id: 'rrValueLabels',
+                            afterDatasetsDraw(chartInstance) {
+                                const ctx = chartInstance.ctx;
+                                ctx.save();
+                                ctx.font = "bold 14px 'Inter', sans-serif";
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillStyle = '#1e293b';
+
+                                chartInstance.data.datasets.forEach(function (dataset, i) {
+                                    const meta = chartInstance.getDatasetMeta(i);
+                                    meta.data.forEach(function (bar, index) {
+                                        const data = dataset.data[index];
+                                        if (data !== null && data !== undefined) {
+                                            ctx.fillText(data, bar.x + 8, bar.y);
+                                        }
+                                    });
+                                });
+                                ctx.restore();
+                            }
+                        }
+                    ],
+                    options: { 
+                        ...commonOptions, 
+                        indexAxis: 'y', 
+                        layout: {
+                            padding: {
+                                right: 60
+                            }
+                        },
+                        plugins: { 
+                            legend: { display: false },
+                            tooltip: {
+                                titleFont: {
+                                    size: 15,
+                                    weight: 'bold',
+                                    family: "'Inter', sans-serif"
+                                },
+                                bodyFont: {
+                                    size: 14,
+                                    weight: 'bold',
+                                    family: "'Inter', sans-serif"
+                                },
+                                padding: 12,
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const val = ctx.raw;
+                                        return rrMode === 'manpower_rasio'
+                                            ? ` ${val} (temuan YTD ÷ manpower × bulan)`
+                                            : ` ${val}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: { 
+                            x: { 
+                                beginAtZero: true, 
+                                grace: '15%',
+                                grid: { display: false },
+                                ticks: {
+                                    font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                    color: '#1e293b'
+                                }
                             },
-                            bodyFont: {
-                                size: 14,
-                                weight: 'bold',
-                                family: "'Inter', sans-serif"
-                            },
-                            padding: 12,
-                            callbacks: {
-                                label: (ctx) => {
-                                    const val = ctx.raw;
-                                    return rrMode === 'manpower_rasio'
-                                        ? ` ${val} (temuan YTD ÷ manpower × bulan)`
-                                        : ` ${val}`;
+                            y: { 
+                                grid: { display: false },
+                                ticks: {
+                                    font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                    color: '#1e293b'
                                 }
                             }
                         }
-                    },
-                    scales: { 
-                        x: { 
-                            beginAtZero: true, 
-                            grace: '15%',
-                            grid: { display: false },
-                            ticks: {
-                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
-                                color: '#1e293b'
-                            }
-                        },
-                        y: { 
-                            grid: { display: false },
-                            ticks: {
-                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
-                                color: '#1e293b'
-                            }
-                        }
                     }
-                }
-            });
+                });
+            }
         }
 
         // 3. Pie Chart - Kategori PEKA
@@ -1402,7 +1512,7 @@
         const chart3Values = getValues(charts.kategori);
         const chart3Total = chart3Values.reduce((a, b) => a + b, 0);
 
-        new Chart(document.getElementById('chart3'), {
+        getOrCreateChart('chart3', {
             type: 'pie',
             plugins: [ChartDataLabels],
             data: { 
@@ -1500,7 +1610,7 @@
 
             if (invLabels.length === 0) return;
 
-            const koStatus = @json($koStatus ?? 'ok');
+            const koStatus = (dataExtra && dataExtra.koStatus) ? dataExtra.koStatus : @json($koStatus ?? 'ok');
             const isOk     = koStatus === 'ok';
 
             // ---- Siapkan data chart -----------------------------------------
@@ -1512,7 +1622,7 @@
             const sisBgColors = invLabels.map(k => (isOk && invRaw[k] !== null) ? '#5AA2D7'  : '#E2E8F0');
 
             // ---- Render Chart ------------------------------------------------
-            new Chart(document.getElementById('chart4'), {
+            getOrCreateChart('chart4', {
                 type: 'bar',
                 plugins: [ChartDataLabels],
                 data: {
@@ -1571,8 +1681,14 @@
                         const key = invLabels[el.index];
                         if (!key) return;
 
-                        if (typeof window.openUnreportedModal === 'function') {
-                            window.openUnreportedModal(key);
+                        if (el.datasetIndex === 0) {
+                            if (typeof window.openReportedModal === 'function') {
+                                window.openReportedModal(key);
+                            }
+                        } else {
+                            if (typeof window.openUnreportedModal === 'function') {
+                                window.openUnreportedModal(key);
+                            }
                         }
                     },
                     scales: {
@@ -1651,7 +1767,7 @@
         const closedData = ptLabels.map(l => charts.persentase_fungsi[l].closed);
         const openData = ptLabels.map(l => charts.persentase_fungsi[l].open);
         
-        new Chart(document.getElementById('chart5'), {
+        getOrCreateChart('chart5', {
             type: 'bar',
             plugins: [ChartDataLabels],
             data: {
@@ -1748,7 +1864,7 @@
             const color = '{{ $currentColor['hex'] }}';
             const remaining = Math.max(0, 100 - pct);
 
-            new Chart(chart6El, {
+            getOrCreateChart('chart6', {
                 type: 'doughnut',
                 plugins: [ChartDataLabels],
                 data: {
@@ -1844,7 +1960,7 @@
             
             const total = chartData.total || 1; // Prevent division by zero
             
-            new Chart(document.getElementById(ctxId), {
+            getOrCreateChart(ctxId, {
                 type: 'bar',
                 plugins: [ChartDataLabels],
                 data: { 
@@ -1947,15 +2063,223 @@
 
         // 8. Horizontal Bar - Unsafe Condition
         renderHorizontalBar('chart8', charts.unsafe_condition, '#ED7D31');
+    };
+
+    // Initial render on page load
+    window.renderAllTab1Charts(initialCharts, initialGlobalCharts);
+
+    // ================================================================
+    // AJAX FILTER HANDLING (TAB 1)
+    // ================================================================
+    let currentRequestId = 0;
+    let activeAbortController = null;
+
+    function showTab1Loading(show) {
+        const el = document.getElementById('filter-loading-indicator');
+        if (el) {
+            if (show) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        }
+    }
+
+    function showFilterError(msg) {
+        let toast = document.getElementById('filter-error-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'filter-error-toast';
+            toast.className = 'fixed bottom-6 right-6 z-50 bg-red-600 text-white text-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 transition-opacity';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 4500);
+    }
+
+    function updateTab1Kpi(kpi) {
+        if (!kpi) return;
+        const totalEl = document.getElementById('kpi-total');
+        const openEl = document.getElementById('kpi-open');
+        const closedEl = document.getElementById('kpi-closed');
+        if (totalEl) totalEl.textContent = Number(kpi.total || 0).toLocaleString('id-ID');
+        if (openEl) openEl.textContent = Number(kpi.open || 0).toLocaleString('id-ID');
+        if (closedEl) closedEl.textContent = Number(kpi.closed || 0).toLocaleString('id-ID');
+    }
+
+    function fetchTab1Dashboard(params = {}) {
+        if (activeAbortController) {
+            activeAbortController.abort();
+        }
+        activeAbortController = new AbortController();
+        const reqId = ++currentRequestId;
+        showTab1Loading(true);
+
+        const currentUrl = new URL(window.location.href);
+        Object.keys(params).forEach(k => {
+            if (params[k] === null || params[k] === '') {
+                currentUrl.searchParams.delete(k);
+            } else {
+                currentUrl.searchParams.set(k, params[k]);
+            }
+        });
+
+        const fetchUrl = currentUrl.pathname + currentUrl.search;
+
+        fetch(fetchUrl, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            signal: activeAbortController.signal
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            if (reqId !== currentRequestId) return;
+            showTab1Loading(false);
+            if (!data.success) throw new Error(data.message || 'Gagal memuat data');
+
+            updateTab1Kpi(data.kpi);
+
+            if (data.fungsiSapPct !== undefined) {
+                const c6Center = document.getElementById('chart6-center-pct');
+                if (c6Center) c6Center.textContent = data.fungsiSapPct + '%';
+            }
+
+            if (data.selectedYear !== undefined && filterYear && String(data.selectedYear) !== filterYear.value) {
+                filterYear.value = data.selectedYear || '';
+            }
+            if (data.selectedMonth !== undefined && filterMonth && String(data.selectedMonth) !== filterMonth.value) {
+                filterMonth.value = data.selectedMonth || '';
+            }
+            if (data.koYear !== undefined && koYearFilter && String(data.koYear) !== koYearFilter.value) {
+                koYearFilter.value = data.koYear || '';
+            }
+            if (data.koMonth !== undefined && koMonthFilter && String(data.koMonth) !== koMonthFilter.value) {
+                koMonthFilter.value = data.koMonth || '';
+            }
+            if (data.rrYear !== undefined && rrYearFilter && String(data.rrYear) !== rrYearFilter.value) {
+                rrYearFilter.value = data.rrYear || '';
+            }
+            if (data.rrMonth !== undefined && rrMonthFilter && String(data.rrMonth) !== rrMonthFilter.value) {
+                rrMonthFilter.value = data.rrMonth || '';
+            }
+
+            if (data.charts && data.charts.reporting) {
+                const rTitle = document.getElementById('chart2-title');
+                const rSub   = document.getElementById('chart2-subtitle');
+                const rMode  = data.charts.reporting.mode || 'distribusi';
+                if (rTitle) {
+                    if (rMode === 'manpower_rasio') {
+                        const rBulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                        const rMonthName = data.rrMonth ? (rBulanNama[data.rrMonth] || '') : '';
+                        const rPeriod = rMonthName ? (rMonthName + ' ' + (data.rrYear || '')) : (data.charts.reporting.periode_label || '');
+                        rTitle.textContent = '2. Reporting Rate per Fungsi (' + rPeriod + ')';
+                    } else {
+                        rTitle.textContent = '2. Reporting Rate per Fungsi';
+                    }
+                }
+                if (rSub) {
+                    rSub.textContent = (rMode === 'manpower_rasio')
+                        ? 'temuan YTD ÷ (manpower × bulan)'
+                        : 'jumlah pelaporan ÷ manpower tahunan';
+                }
+            }
+
+            window.renderAllTab1Charts(data.charts, data.globalCharts, data);
+
+            window.history.replaceState({}, '', fetchUrl);
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') return;
+            showTab1Loading(false);
+            console.error('AJAX filter error:', err);
+            showFilterError('Gagal memuat data filter (' + (err.message || 'Error') + '). Data sebelumnya tetap dipertahankan.');
+        });
+    }
+
+    // Attach event listeners for Tab 1
+    const filterYear = document.getElementById('filter-year');
+    if (filterYear) {
+        filterYear.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab1Dashboard({ year: this.value });
+        });
+    }
+
+    const filterMonth = document.getElementById('filter-month');
+    if (filterMonth) {
+        filterMonth.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab1Dashboard({ month: this.value });
+        });
+    }
+
+    const rrYearFilter = document.getElementById('rr-year-filter');
+    if (rrYearFilter) {
+        rrYearFilter.removeAttribute('onchange');
+        rrYearFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab1Dashboard({ rr_year: this.value });
+        });
+    }
+
+    const rrMonthFilter = document.getElementById('rr-month-filter');
+    if (rrMonthFilter) {
+        rrMonthFilter.removeAttribute('onchange');
+        rrMonthFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab1Dashboard({ rr_month: this.value });
+        });
+    }
+
+    const koYearFilter = document.getElementById('ko-year-filter');
+    if (koYearFilter) {
+        koYearFilter.removeAttribute('onchange');
+        koYearFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab1Dashboard({ ko_year: this.value });
+        });
+    }
+
+    const koMonthFilter = document.getElementById('ko-month-filter');
+    if (koMonthFilter) {
+        koMonthFilter.removeAttribute('onchange');
+        koMonthFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab1Dashboard({ ko_month: this.value });
+        });
+    }
     });
 </script>
 @endif
 
 @if($activeTab === 'global')
 <script>
+    window.chartInstances = window.chartInstances || {};
+
+    function getOrCreateChart(canvasId, config) {
+        if (window.chartInstances[canvasId]) {
+            try {
+                window.chartInstances[canvasId].destroy();
+            } catch(e) {
+                console.warn('Error destroying chart ' + canvasId, e);
+            }
+            delete window.chartInstances[canvasId];
+        }
+        const canvas = typeof canvasId === 'string' ? document.getElementById(canvasId) : canvasId;
+        if (!canvas) return null;
+        const idKey = canvas.id || canvasId;
+        const chart = new Chart(canvas, config);
+        window.chartInstances[idKey] = chart;
+        return chart;
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-        const globalCharts = @json($globalCharts ?? []);
-        if(Object.keys(globalCharts).length === 0) return;
+        const initialGlobalCharts = @json($globalCharts ?? []);
 
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#64748B';
@@ -1979,18 +2303,21 @@
         const getValues = (obj) => Object.values(obj || {});
         const getBgColors = (keys) => keys.map(k => colors[k] || '#9CA3AF');
 
-        // 1. G-Chart 1: Jumlah Pelaporan per Fungsi (Pie)
-        const gChart1Labels = getLabels(globalCharts.fungsi);
-        const gChart1Values = getValues(globalCharts.fungsi);
-        const gChart1Total  = gChart1Values.reduce((a, b) => a + b, 0);
+        window.renderAllTab2Charts = function(globalCharts, dataExtra = {}) {
+            if (!globalCharts || Object.keys(globalCharts).length === 0) return;
 
-        const gChart1El = document.getElementById('g_chart1');
-        if (gChart1El) {
-            new Chart(gChart1El, {
-                type: 'pie',
-                plugins: [ChartDataLabels],
-                data: {
-                    labels: gChart1Labels,
+            // 1. G-Chart 1: Jumlah Pelaporan per Fungsi (Pie)
+            const gChart1Labels = getLabels(globalCharts.fungsi);
+            const gChart1Values = getValues(globalCharts.fungsi);
+            const gChart1Total  = gChart1Values.reduce((a, b) => a + b, 0);
+
+            const gChart1El = document.getElementById('g_chart1');
+            if (gChart1El) {
+                getOrCreateChart('g_chart1', {
+                    type: 'pie',
+                    plugins: [ChartDataLabels],
+                    data: {
+                        labels: gChart1Labels,
                     datasets: [{
                         data: gChart1Values,
                         backgroundColor: getBgColors(gChart1Labels),
@@ -2054,70 +2381,100 @@
         };
         const gRrBgColors = gRrLabels.map(l => gRrColorMap[l] || '#9CA3AF');
 
-        const gChart2El = document.getElementById('g_chart2');
-        if (gChart2El && gRrLabels.length > 0) {
-            new Chart(gChart2El, {
-                type: 'bar',
-                data: {
-                    labels: gRrLabels,
-                    datasets: [{
-                        data: gRrValues,
-                        backgroundColor: gRrBgColors,
-                        borderRadius: 4,
-                    }]
-                },
-                options: {
-                    ...commonOptions,
-                    indexAxis: 'y',
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            titleFont: { size: 15, weight: 'bold', family: "'Inter', sans-serif" },
-                            bodyFont: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
-                            padding: 12,
-                            callbacks: {
-                                label: (ctx) => {
-                                    const val = ctx.raw;
-                                    return gRrMode === 'manpower_rasio'
-                                        ? ` ${val} (temuan YTD ÷ manpower × bulan)`
-                                        : ` ${val}`;
+        const gChart2El         = document.getElementById('g_chart2');
+        const gChart2EmptyEl    = document.getElementById('g_chart2_empty');
+        const gChart2NoticeCont = document.getElementById('g_chart2_notice_container');
+        const gChart2Notice     = document.getElementById('g_chart2_notice');
+
+        const currentGRrStatus = (dataExtra && dataExtra.gRrStatus) ? dataExtra.gRrStatus : '{{ $gRrStatus }}';
+        const isGRrEmpty       = gRrLabels.length === 0 || currentGRrStatus === 'no_sipeka';
+
+        if (isGRrEmpty) {
+            if (gChart2El) gChart2El.classList.add('hidden');
+            if (gChart2EmptyEl) gChart2EmptyEl.classList.remove('hidden');
+            if (gChart2NoticeCont) gChart2NoticeCont.classList.remove('hidden');
+            if (gChart2Notice && dataExtra && dataExtra.gRrYear) {
+                const yr = dataExtra.gRrYear || '';
+                const mo = dataExtra.gRrMonth;
+                const bNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                const moText = mo && bNama[mo] ? bNama[mo] + ' ' : '';
+                gChart2Notice.innerHTML = `⚠️ Data temuan SIPEKA pada periode <strong>${moText}${yr}</strong> belum tersedia.`;
+            }
+            if (window.chartInstances && window.chartInstances['g_chart2']) {
+                try {
+                    window.chartInstances['g_chart2'].destroy();
+                } catch(e) {}
+                delete window.chartInstances['g_chart2'];
+            }
+        } else {
+            if (gChart2El) gChart2El.classList.remove('hidden');
+            if (gChart2EmptyEl) gChart2EmptyEl.classList.add('hidden');
+            if (gChart2NoticeCont) gChart2NoticeCont.classList.add('hidden');
+
+            if (gChart2El) {
+                getOrCreateChart('g_chart2', {
+                    type: 'bar',
+                    data: {
+                        labels: gRrLabels,
+                        datasets: [{
+                            data: gRrValues,
+                            backgroundColor: gRrBgColors,
+                            borderRadius: 4,
+                        }]
+                    },
+                    options: {
+                        ...commonOptions,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                titleFont: { size: 15, weight: 'bold', family: "'Inter', sans-serif" },
+                                bodyFont: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                padding: 12,
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const val = ctx.raw;
+                                        return gRrMode === 'manpower_rasio'
+                                            ? ` ${val} (temuan YTD ÷ manpower × bulan)`
+                                            : ` ${val}`;
+                                    }
                                 }
                             }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            grid: { display: false },
-                            ticks: { font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" }, color: '#1e293b' }
                         },
-                        y: {
-                            grid: { display: false },
-                            ticks: { font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" }, color: '#1e293b' }
-                        }
-                    },
-                    animation: {
-                        onComplete: function() {
-                            var chartInstance = this;
-                            var ctx = chartInstance.ctx;
-                            ctx.font = "bold 14px 'Inter', sans-serif";
-                            ctx.textAlign = 'left';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillStyle = '#1e293b';
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                grid: { display: false },
+                                ticks: { font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" }, color: '#1e293b' }
+                            },
+                            y: {
+                                grid: { display: false },
+                                ticks: { font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" }, color: '#1e293b' }
+                            }
+                        },
+                        animation: {
+                            onComplete: function() {
+                                var chartInstance = this;
+                                var ctx = chartInstance.ctx;
+                                ctx.font = "bold 14px 'Inter', sans-serif";
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillStyle = '#1e293b';
 
-                            this.data.datasets.forEach(function (dataset, i) {
-                                var meta = chartInstance.getDatasetMeta(i);
-                                meta.data.forEach(function (bar, index) {
-                                    var data = dataset.data[index];
-                                    if (data !== null && data !== undefined) {
-                                        ctx.fillText(data, bar.x + 5, bar.y);
-                                    }
+                                this.data.datasets.forEach(function (dataset, i) {
+                                    var meta = chartInstance.getDatasetMeta(i);
+                                    meta.data.forEach(function (bar, index) {
+                                        var data = dataset.data[index];
+                                        if (data !== null && data !== undefined) {
+                                            ctx.fillText(data, bar.x + 5, bar.y);
+                                        }
+                                    });
                                 });
-                            });
+                            }
                         }
                     }
-                }
-            });
+                });
+            }
         }
 
         // 3. G-Chart Trending: Rekap PEKA Bulanan (Mixed Bar + Line)
@@ -2180,7 +2537,7 @@
 
             const trendCanvas = document.getElementById('g_chartTrending');
             if (trendCanvas) {
-                const chartInstance = new Chart(trendCanvas, {
+                const chartInstance = getOrCreateChart('g_chartTrending', {
                     type: 'bar',
                     plugins: [totalBgPlugin],
                     data: {
@@ -2321,7 +2678,7 @@
 
         const gChart3El = document.getElementById('g_chart3');
         if (gChart3El) {
-            new Chart(gChart3El, {
+            getOrCreateChart('g_chart3', {
                 type: 'pie',
                 plugins: [ChartDataLabels],
                 data: {
@@ -2400,7 +2757,7 @@
 
             if (notice4) {
                 if (allNull) {
-                    const gMonthVal = @json($gKoMonth ?? null);
+                    const gMonthVal = (dataExtra && dataExtra.gKoMonth) ? dataExtra.gKoMonth : @json($gKoMonth ?? null);
                     if (gMonthVal) {
                         notice4.innerHTML = '⚠️ Data manpower belum tersedia untuk periode ini. Pastikan data manpower sudah diinput di menu <strong>Master Manpower</strong>.';
                         notice4.classList.remove('hidden');
@@ -2420,7 +2777,7 @@
 
             const gChart4El = document.getElementById('g_chart4');
             if (gChart4El) {
-                new Chart(gChart4El, {
+                getOrCreateChart('g_chart4', {
                     type: 'bar',
                     plugins: [ChartDataLabels],
                     data: {
@@ -2479,8 +2836,14 @@
                             const key = invLabels[el.index];
                             if (!key) return;
 
-                            if (typeof window.openUnreportedModal === 'function') {
-                                window.openUnreportedModal(key);
+                            if (el.datasetIndex === 0) {
+                                if (typeof window.openReportedModal === 'function') {
+                                    window.openReportedModal(key);
+                                }
+                            } else {
+                                if (typeof window.openUnreportedModal === 'function') {
+                                    window.openUnreportedModal(key);
+                                }
                             }
                         },
                         scales: {
@@ -2542,7 +2905,7 @@
 
         const gChart5El = document.getElementById('g_chart5');
         if (gChart5El) {
-            new Chart(gChart5El, {
+            getOrCreateChart('g_chart5', {
                 type: 'bar',
                 plugins: [ChartDataLabels],
                 data: {
@@ -2633,7 +2996,7 @@
                 const lightBg = ['#FFC000', '#CBD5E1', '#9CA3AF'];
                 return lightBg.includes(bgColor) ? '#1e293b' : '#ffffff';
             };
-            new Chart(gChart6El, {
+            getOrCreateChart('g_chart6', {
                 type: 'doughnut',
                 plugins: [ChartDataLabels],
                 data: {
@@ -2694,7 +3057,7 @@
             const el = document.getElementById(ctxId);
             if (!el) return;
 
-            new Chart(el, {
+            getOrCreateChart(ctxId, {
                 type: 'bar',
                 plugins: [ChartDataLabels],
                 data: {
@@ -2777,7 +3140,205 @@
         if (globalCharts.unsafe_condition) {
             renderGHorizontalBar('g_chart8', globalCharts.unsafe_condition, '#ED7D31');
         }
-    });
+    };
+
+    // Initial render for Tab 2
+    window.renderAllTab2Charts(initialGlobalCharts);
+
+    // ================================================================
+    // AJAX FILTER HANDLING (TAB 2 / GLOBAL)
+    // ================================================================
+    let activeTab2AbortController = null;
+    let currentTab2RequestId = 0;
+
+    function showTab2Loading(show) {
+        const el = document.getElementById('g-filter-loading-indicator');
+        if (el) {
+            if (show) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        }
+    }
+
+    function showGlobalFilterError(msg) {
+        let toast = document.getElementById('filter-error-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'filter-error-toast';
+            toast.className = 'fixed bottom-6 right-6 z-50 bg-red-600 text-white text-sm px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 transition-opacity';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 4500);
+    }
+
+    function updateTab2Kpi(kpi) {
+        if (!kpi) return;
+        const totalEl = document.getElementById('g-kpi-total');
+        const openEl = document.getElementById('g-kpi-open');
+        const closedEl = document.getElementById('g-kpi-closed');
+        if (totalEl) totalEl.textContent = Number(kpi.total || 0).toLocaleString('id-ID');
+        if (openEl) openEl.textContent = Number(kpi.open || 0).toLocaleString('id-ID');
+        if (closedEl) closedEl.textContent = Number(kpi.closed || 0).toLocaleString('id-ID');
+    }
+
+    function fetchTab2Dashboard(params = {}) {
+        if (activeTab2AbortController) {
+            activeTab2AbortController.abort();
+        }
+        activeTab2AbortController = new AbortController();
+        const reqId = ++currentTab2RequestId;
+        showTab2Loading(true);
+
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('tab', 'global');
+        Object.keys(params).forEach(k => {
+            if (params[k] === null || params[k] === '') {
+                currentUrl.searchParams.delete(k);
+            } else {
+                currentUrl.searchParams.set(k, params[k]);
+            }
+        });
+
+        const fetchUrl = currentUrl.pathname + currentUrl.search;
+
+        fetch(fetchUrl, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            signal: activeTab2AbortController.signal
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            if (reqId !== currentTab2RequestId) return;
+            showTab2Loading(false);
+            if (!data.success) throw new Error(data.message || 'Gagal memuat data');
+
+            updateTab2Kpi(data.globalKpi);
+
+            if (data.gYear !== undefined && gFilterYear && String(data.gYear) !== gFilterYear.value) {
+                gFilterYear.value = data.gYear || '';
+            }
+            if (data.gMonth !== undefined && gFilterMonth && String(data.gMonth) !== gFilterMonth.value) {
+                gFilterMonth.value = data.gMonth || '';
+            }
+            if (data.gKoYear !== undefined && gKoYear && String(data.gKoYear) !== gKoYear.value) {
+                gKoYear.value = data.gKoYear || '';
+            }
+            if (data.gKoMonth !== undefined && gKoMonth && String(data.gKoMonth) !== gKoMonth.value) {
+                gKoMonth.value = data.gKoMonth || '';
+            }
+            if (data.gRrYear !== undefined && gRrYear && String(data.gRrYear) !== gRrYear.value) {
+                gRrYear.value = data.gRrYear || '';
+            }
+            if (data.gRrMonth !== undefined && gRrMonth && String(data.gRrMonth) !== gRrMonth.value) {
+                gRrMonth.value = data.gRrMonth || '';
+            }
+            if (data.gPekaYear !== undefined && gPekaYear && String(data.gPekaYear) !== gPekaYear.value) {
+                gPekaYear.value = data.gPekaYear || '';
+            }
+
+            if (data.globalCharts && data.globalCharts.reporting) {
+                const grTitle = document.getElementById('g-chart2-title');
+                const grSub   = document.getElementById('g-chart2-subtitle');
+                const grMode  = data.globalCharts.reporting.mode || 'distribusi';
+                if (grTitle) {
+                    if (grMode === 'manpower_rasio') {
+                        const rBulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                        const rMonthName = data.gRrMonth ? (rBulanNama[data.gRrMonth] || '') : '';
+                        const rPeriod = rMonthName ? (rMonthName + ' ' + (data.gRrYear || '')) : (data.globalCharts.reporting.periode_label || '');
+                        grTitle.textContent = '2. Reporting Rate per Fungsi (' + rPeriod + ')';
+                    } else {
+                        grTitle.textContent = '2. Reporting Rate per Fungsi';
+                    }
+                }
+                if (grSub) {
+                    grSub.textContent = (grMode === 'manpower_rasio')
+                        ? 'temuan YTD ÷ (manpower × bulan)'
+                        : 'jumlah pelaporan ÷ manpower tahunan';
+                }
+            }
+
+            window.renderAllTab2Charts(data.globalCharts, data);
+
+            window.history.replaceState({}, '', fetchUrl);
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') return;
+            showTab2Loading(false);
+            console.error('AJAX global filter error:', err);
+            showGlobalFilterError('Gagal memuat data filter global (' + (err.message || 'Error') + '). Data sebelumnya tetap dipertahankan.');
+        });
+    }
+
+    // Event listeners for Tab 2
+    const gFilterYear = document.getElementById('g-filter-year');
+    if (gFilterYear) {
+        gFilterYear.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab2Dashboard({ g_year: this.value });
+        });
+    }
+
+    const gFilterMonth = document.getElementById('g-filter-month');
+    if (gFilterMonth) {
+        gFilterMonth.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab2Dashboard({ g_month: this.value });
+        });
+    }
+
+    const gRrYear = document.getElementById('g-rr-year-filter');
+    if (gRrYear) {
+        gRrYear.removeAttribute('onchange');
+        gRrYear.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab2Dashboard({ g_rr_year: this.value });
+        });
+    }
+
+    const gRrMonth = document.getElementById('g-rr-month-filter');
+    if (gRrMonth) {
+        gRrMonth.removeAttribute('onchange');
+        gRrMonth.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab2Dashboard({ g_rr_month: this.value });
+        });
+    }
+
+    const gPekaYear = document.getElementById('g-peka-year-filter');
+    if (gPekaYear) {
+        gPekaYear.removeAttribute('onchange');
+        gPekaYear.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab2Dashboard({ g_peka_year: this.value });
+        });
+    }
+
+    const gKoYear = document.getElementById('g-ko-year-filter');
+    if (gKoYear) {
+        gKoYear.removeAttribute('onchange');
+        gKoYear.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab2Dashboard({ g_ko_year: this.value });
+        });
+    }
+
+    const gKoMonth = document.getElementById('g-ko-month-filter');
+    if (gKoMonth) {
+        gKoMonth.removeAttribute('onchange');
+        gKoMonth.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchTab2Dashboard({ g_ko_month: this.value });
+        });
+    }
+});
 </script>
 @endif
 @endpush

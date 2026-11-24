@@ -51,10 +51,10 @@
 
         // Dropdown bulan khusus Reporting Rate — hanya tampilkan bulan yang
         // benar-benar memiliki data SIPEKA pada tahun yang dipilih.
-        // $maxBulanSipeka dikirim dari controller (null jika tahun belum dipilih).
-        $rrBulanList = ($maxBulanSipeka ?? null)
-            ? array_filter($bulanNamaList, fn($num) => $num <= $maxBulanSipeka, ARRAY_FILTER_USE_KEY)
-            : $bulanNamaList; // fallback: tampilkan semua jika tahun belum dipilih
+        // $rrMaxBulan dikirim dari controller (null jika tahun belum dipilih atau data tidak ada).
+        $rrBulanList = ($rrMaxBulan ?? null)
+            ? array_filter($bulanNamaList, fn($num) => $num <= $rrMaxBulan, ARRAY_FILTER_USE_KEY)
+            : $bulanNamaList; // fallback: tampilkan semua jika tahun belum dipilih atau tidak ada batas max
     @endphp
 
     <!-- KPI Cards -->
@@ -63,7 +63,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Total Temuan</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['total'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="kpi-total">{{ number_format($kpi['total'] ?? 0) }}</h3>
                 <div class="mt-2 text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full w-fit">Keseluruhan Data</div>            </div>
             <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
@@ -74,7 +74,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Status Open</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['open'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="kpi-open">{{ number_format($kpi['open'] ?? 0) }}</h3>
                 <div class="mt-2 text-xs font-medium text-red-600 bg-red-50 px-2.5 py-1 rounded-full w-fit">Butuh Tindak Lanjut</div>            </div>
             <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-inner">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -85,7 +85,7 @@
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex items-start justify-between">
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Status Closed</p>
-                <h3 class="text-3xl font-bold text-slate-800">{{ number_format($kpi['closed'] ?? 0) }}</h3>
+                <h3 class="text-3xl font-bold text-slate-800" id="kpi-closed">{{ number_format($kpi['closed'] ?? 0) }}</h3>
                 <div class="mt-2 text-xs font-medium text-green-600 bg-green-50 px-2.5 py-1 rounded-full w-fit">Telah Diselesaikan</div>            </div>
             <div class="w-12 h-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center shadow-inner">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -177,12 +177,16 @@
                 $rrMode = $charts['reporting']['mode'] ?? 'distribusi';
                 $rrData = $charts['reporting']['data'] ?? [];
                 $hasNull = in_array(null, $rrData, true);
+                $rrValidCount = count(array_filter($rrData, fn($v) => $v !== null));
+                $isRrEmpty = ($rrValidCount === 0) || (($rrStatus ?? 'ok') === 'no_sipeka');
 
                 // Teks periode: jika bulan dipilih → tampilkan nama bulan saja
                 // jika hanya tahun → tampilkan label dari backend
                 // jika tidak ada filter → tidak ada label periode
                 if ($rrMode === 'manpower_rasio') {
-                    if ($selectedMonth ?? null) {
+                    if ($rrMonth && isset($bulanNamaList[$rrMonth])) {
+                        $rrPeriodeLabel = $bulanNamaList[$rrMonth] . ' ' . ($rrYear ?? '');
+                    } elseif ($selectedMonth ?? null) {
                         $rrPeriodeLabel = $bulanNamaList[$selectedMonth] . ' ' . ($selectedYear ?? '');
                     } else {
                         $rrPeriodeLabel = $charts['reporting']['periode_label'] ?? '';
@@ -196,44 +200,63 @@
             {{-- Header: Judul + Filter in-card --}}
             <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="text-[22px] font-bold text-slate-800">{{ $rrLabel }}</h3>
-                    @if($rrMode === 'manpower_rasio')
-                        <span class="text-xs font-mono text-slate-400">temuan YTD ÷ (manpower × bulan)</span>
-                    @endif
+                    <h3 class="text-[22px] font-bold text-slate-800" id="chart2-title">{{ $rrLabel }}</h3>
+                    <p class="text-xs font-mono text-slate-400" id="chart2-subtitle">
+                        @if($rrMode === 'manpower_rasio')
+                            temuan YTD ÷ (manpower × bulan)
+                        @else
+                            jumlah pelaporan ÷ manpower tahunan
+                        @endif
+                    </p>
                 </div>
-                {{-- Filter Tahun & Bulan — khusus untuk card ini --}}
-                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
-                    <select name="year" id="rr-year-filter"
-                        onchange="document.getElementById('rr-month-filter').value=''; this.form.submit()"
+                {{-- Filter Tahun & Bulan — khusus Reporting Rate (Card 2) --}}
+                <form action="" method="GET" onsubmit="return false;" class="flex flex-wrap items-center gap-2">
+                    {{-- Pertahankan filter utama dan filter card lain yang sudah aktif --}}
+                    @if($selectedYear)
+                        <input type="hidden" name="year" value="{{ $selectedYear }}">
+                    @endif
+                    @if($selectedMonth)
+                        <input type="hidden" name="month" value="{{ $selectedMonth }}">
+                    @endif
+                    @if($selectedPekaYear && $selectedPekaYear != ($selectedYear ?? now()->year))
+                        <input type="hidden" name="peka_year" value="{{ $selectedPekaYear }}">
+                    @endif
+                    <select name="rr_year" id="rr-year-filter"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
-                        <option value="">Semua Tahun</option>
+                        @if(!$latestDataYear)
+                            <option value="">Semua Tahun</option>
+                        @endif
                         @foreach($tahunList as $yr)
-                            <option value="{{ $yr }}" {{ ($selectedYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                            <option value="{{ $yr }}" {{ ($rrYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                         @endforeach
                     </select>
-                    <select name="month" id="rr-month-filter"
-                        onchange="this.form.submit()"
-                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm {{ !($selectedYear ?? null) ? 'opacity-50' : '' }}"
-                        {{ !($selectedYear ?? null) ? 'disabled' : '' }}>
+                    <select name="rr_month" id="rr-month-filter"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
                         <option value="">Semua Bulan</option>
-                        {{-- $rrBulanList hanya berisi bulan yang memiliki data SIPEKA aktual --}}
                         @foreach($rrBulanList as $num => $nama)
-                            <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                            <option value="{{ $num }}" {{ ($rrMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
                         @endforeach
                     </select>
-                    @if(($selectedYear ?? null) || ($selectedMonth ?? null))
+                    @if(($rrYear ?? null) != $latestDataYear || ($rrMonth ?? null) != $rrMaxBulan)
                         <a href="{{ route('dashboard') }}" class="text-xs text-slate-400 hover:text-slate-600 underline whitespace-nowrap">Reset</a>
                     @endif
                 </form>
             </div>
 
-            @if($rrMode === 'manpower_rasio' && $hasNull)
-                <p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mb-2">
+            @if($rrMode === 'manpower_rasio' && $hasNull && !$isRrEmpty)
+                <p id="chart2-warning" class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mb-2">
                     ⚠️ Beberapa fungsi tidak memiliki data manpower untuk periode ini. Reporting Rate hanya ditampilkan untuk fungsi yang memiliki data manpower.
                 </p>
             @endif
-            <div class="flex-1 relative w-full h-full">
-                <canvas id="chart2"></canvas>
+            <div class="flex-1 relative w-full h-full min-h-0 flex items-center justify-center">
+                <canvas id="chart2" class="w-full h-full {{ $isRrEmpty ? 'hidden' : '' }}"></canvas>
+                <div id="chart2_empty" class="{{ $isRrEmpty ? '' : 'hidden' }} flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                    <svg class="w-12 h-12 mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <p class="text-sm font-medium text-slate-500">Data tidak tersedia</p>
+                    <p class="text-xs text-slate-400 mt-1">Data temuan SIPEKA atau manpower untuk periode ini belum tersedia.</p>
+                </div>
             </div>
         </div>
 
@@ -274,7 +297,7 @@
                         </div>
                     </div>
                     {{-- Filter Tahun Mandiri — hanya untuk Rekap PEKA --}}
-                    <form action="" method="GET" class="flex items-center gap-2">
+                    <form action="" method="GET" onsubmit="return false;" class="flex items-center gap-2">
                         {{-- Pertahankan filter chart lain yang sudah aktif --}}
                         @if($selectedYear)
                             <input type="hidden" name="year" value="{{ $selectedYear }}">
@@ -283,7 +306,6 @@
                             <input type="hidden" name="month" value="{{ $selectedMonth }}">
                         @endif
                         <select name="peka_year" id="peka-year-filter"
-                            onchange="this.form.submit()"
                             class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
                             @foreach($tahunList as $yr)
                                 <option value="{{ $yr }}" {{ $selectedPekaYear == $yr ? 'selected' : '' }}>{{ $yr }}</option>
@@ -408,9 +430,16 @@
                             <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
                             Klik bar untuk daftar personil
                         </span>
+                        <button type="button" id="btn-reported-all"
+                                onclick="window.openReportedModal && window.openReportedModal('all')"
+                                class="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200 transition"
+                                title="Daftar Sudah Melapor untuk seluruh 4 fungsi utama">
+                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Daftar sudah melapor — semua fungsi
+                        </button>
                         <button type="button" id="btn-unreported-all"
                                 onclick="window.openUnreportedModal && window.openUnreportedModal('all')"
-                                class="inline-flex items-center gap-1 text-[11px] text-slate-600 font-medium bg-slate-50 hover:bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 transition"
+                                class="inline-flex items-center gap-1 text-[11px] text-slate-600 font-medium bg-slate-50 hover:bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 transition"
                                 title="Daftar Belum Melapor untuk seluruh 4 fungsi utama">
                             Daftar belum melapor — semua fungsi
                         </button>
@@ -419,37 +448,50 @@
                         Rumus: Pelapor unik Jan s/d bulan terpilih &divide; Manpower bulan terpilih &times; 100%
                     </p>
                 </div>
-                {{-- Filter Tahun & Bulan — khusus untuk card ini --}}
-                <form action="" method="GET" class="flex flex-wrap items-center gap-2">
-                    <select name="year" id="ko-year-filter"
-                        onchange="document.getElementById('ko-month-filter').value=''; this.form.submit()"
+                {{-- Filter Tahun & Bulan — khusus Keterlibatan Observasi (Card 4) --}}
+                <form action="" method="GET" onsubmit="return false;" class="flex flex-wrap items-center gap-2">
+                    {{-- Pertahankan filter utama dan filter card lain yang sudah aktif --}}
+                    @if($selectedYear)
+                        <input type="hidden" name="year" value="{{ $selectedYear }}">
+                    @endif
+                    @if($selectedMonth)
+                        <input type="hidden" name="month" value="{{ $selectedMonth }}">
+                    @endif
+                    @if($rrYear)
+                        <input type="hidden" name="rr_year" value="{{ $rrYear }}">
+                    @endif
+                    @if($rrMonth)
+                        <input type="hidden" name="rr_month" value="{{ $rrMonth }}">
+                    @endif
+                    @if($selectedPekaYear)
+                        <input type="hidden" name="peka_year" value="{{ $selectedPekaYear }}">
+                    @endif
+                    <select name="ko_year" id="ko-year-filter"
                         class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
-                        <option value="">Semua Tahun</option>
+                        @if(!$latestDataYear)
+                            <option value="">Semua Tahun</option>
+                        @endif
                         @foreach($tahunList as $yr)
-                            <option value="{{ $yr }}" {{ ($selectedYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                            <option value="{{ $yr }}" {{ ($koYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
                         @endforeach
                     </select>
-                    <select name="month" id="ko-month-filter"
-                        onchange="this.form.submit()"
-                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm {{ !($selectedYear ?? null) ? 'opacity-50' : '' }}"
-                        {{ !($selectedYear ?? null) ? 'disabled' : '' }}>
+                    <select name="ko_month" id="ko-month-filter"
+                        class="bg-white border border-slate-300 text-slate-800 text-sm rounded-lg focus:ring-[#9DBF2A] focus:border-[#9DBF2A] py-1.5 px-2.5 shadow-sm">
                         <option value="">Semua Bulan</option>
                         @foreach($bulanNamaList as $num => $nama)
-                            <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
+                            <option value="{{ $num }}" {{ ($koMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
                         @endforeach
                     </select>
-                    @if(($selectedYear ?? null) || ($selectedMonth ?? null))
+                    @if(($koYear ?? null) != $latestDataYear || ($koMonth ?? null) != $koMaxBulan)
                         <a href="{{ route('dashboard') }}" class="text-xs text-slate-400 hover:text-slate-600 underline whitespace-nowrap">Reset</a>
                     @endif
                 </form>
             </div>
 
             {{-- Notice: belum pilih bulan (Blade — ditampilkan server-side) --}}
-            @if(!($selectedMonth ?? null))
-                <div class="mb-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                    ℹ️ Pilih <strong>Bulan</strong> pada filter di atas untuk menampilkan persentase keterlibatan.
-                </div>
-            @endif
+            <div id="chart4-blade-notice" class="{{ !($koMonth ?? null) ? '' : 'hidden' }} mb-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                ℹ️ Pilih <strong>Bulan</strong> pada filter di atas untuk menampilkan persentase keterlibatan.
+            </div>
 
             {{-- Notice JS: muncul jika manpower tidak tersedia (diisi via JS) --}}
             <div id="chart4-notice" class="hidden mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></div>
@@ -497,19 +539,50 @@
 
     </div>
 
+    {{-- AJAX Loading Indicator & Error Toast --}}
+    <div id="dashboard-loading-indicator" class="hidden fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-slate-900/85 text-white text-xs font-semibold rounded-full shadow-2xl backdrop-blur-sm animate-pulse">
+        <svg class="animate-spin w-4 h-4 text-[#9DBF2A]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+        <span>Memperbarui data dashboard...</span>
+    </div>
+
+    <div id="dashboard-error-toast" class="hidden fixed bottom-6 right-6 z-50 max-w-md flex items-center gap-2 px-4 py-3 bg-red-600 text-white text-xs font-semibold rounded-xl shadow-2xl">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span id="dashboard-error-msg"></span>
+    </div>
+
 </div>
 
 {{-- Modal Daftar Belum Melapor --}}
 @include('components.unreported-modal')
+{{-- Modal Daftar Sudah Melapor --}}
+@include('components.reported-modal')
 
 @endsection
 
 @push('scripts')
 
 <script>
+    window.chartInstances = window.chartInstances || {};
+
+    function getOrCreateChart(canvasId, config) {
+        if (window.chartInstances[canvasId]) {
+            try {
+                window.chartInstances[canvasId].destroy();
+            } catch(e) {
+                console.warn('Error destroying chart ' + canvasId, e);
+            }
+            delete window.chartInstances[canvasId];
+        }
+        const canvas = typeof canvasId === 'string' ? document.getElementById(canvasId) : canvasId;
+        if (!canvas) return null;
+        const idKey = canvas.id || canvasId;
+        const chart = new Chart(canvas, config);
+        window.chartInstances[idKey] = chart;
+        return chart;
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-        const charts = @json($charts ?? []);
-        if(Object.keys(charts).length === 0) return;
+        const initialCharts = @json($charts ?? []);
 
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#64748B';
@@ -527,16 +600,19 @@
         };
 
         // Helper to get array of values and labels from assoc array
-        const getLabels = (obj) => Object.keys(obj);
-        const getValues = (obj) => Object.values(obj);
+        const getLabels = (obj) => Object.keys(obj || {});
+        const getValues = (obj) => Object.values(obj || {});
         const getBgColors = (keys) => keys.map(k => colors[k] || '#9CA3AF');
 
-        // 1. Pie Chart - Jumlah Pelaporan per Fungsi
-        const chart1Labels = getLabels(charts.fungsi);
-        const chart1Values = getValues(charts.fungsi);
-        const chart1Total  = chart1Values.reduce((a, b) => a + b, 0);
+        window.renderAllCharts = function(charts, dataExtra = {}) {
+            if (!charts || Object.keys(charts).length === 0) return;
 
-        new Chart(document.getElementById('chart1'), {
+            // 1. Pie Chart - Jumlah Pelaporan per Fungsi
+            const chart1Labels = getLabels(charts.fungsi);
+            const chart1Values = getValues(charts.fungsi);
+            const chart1Total  = chart1Values.reduce((a, b) => a + b, 0);
+
+            getOrCreateChart('chart1', {
             type: 'pie',
             plugins: [ChartDataLabels],
             data: {
@@ -607,99 +683,128 @@
 
         // 2. Horizontal Bar - Reporting Rate per Fungsi (+ AREA LHD di paling atas)
         // null = manpower belum tersedia, skip dari chart
-        const rrAllData = charts.reporting.data || {};
-        const rrMode    = charts.reporting.mode || 'distribusi';
+        const rrAllData = charts.reporting?.data || {};
+        const rrMode    = charts.reporting?.mode || 'distribusi';
 
         // Tampilkan semua label (termasuk AREA LHD di paling atas)
         // null = manpower belum tersedia, skip dari chart
         const rrLabels = Object.keys(rrAllData).filter(k => rrAllData[k] !== null);
         const rrValues = rrLabels.map(k => rrAllData[k]);
         
-        const rrColorMap = {
-            'AREA LHD': '#002060',
-            'Operation': '#5B9BD5',
-            'Maintenance': '#ED7D31',
-            'HSSE': '#A5A5A5',
-            'Business Support': '#FFC000'
-        };
-        const rrBgColors = rrLabels.map(l => rrColorMap[l] || '#9CA3AF');
+        const chart2El      = document.getElementById('chart2');
+        const chart2EmptyEl = document.getElementById('chart2_empty');
+        const chart2WarnEl  = document.getElementById('chart2-warning');
 
-        if (rrLabels.length > 0) {
-            new Chart(document.getElementById('chart2'), {
-                type: 'bar',
-                data: { 
-                    labels: rrLabels, 
-                    datasets: [{ 
-                        data: rrValues, 
-                        backgroundColor: rrBgColors,
-                        borderRadius: 4,
-                    }] 
-                },
-                options: { 
-                    ...commonOptions, 
-                    indexAxis: 'y', 
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            titleFont: {
-                                size: 15,
-                                weight: 'bold',
-                                family: "'Inter', sans-serif"
-                            },
-                            bodyFont: {
-                                size: 14,
-                                weight: 'bold',
-                                family: "'Inter', sans-serif"
-                            },
-                            padding: 12,
-                            callbacks: {
-                                label: (ctx) => {
-                                    const val = ctx.raw;
-                                    return rrMode === 'manpower_rasio'
-                                        ? ` ${val} (temuan YTD ÷ manpower × bulan)`
-                                        : ` ${val}`;
+        const isRrEmpty = rrLabels.length === 0 || (dataExtra && dataExtra.rrStatus === 'no_sipeka');
+
+        if (isRrEmpty) {
+            if (chart2El) chart2El.classList.add('hidden');
+            if (chart2EmptyEl) chart2EmptyEl.classList.remove('hidden');
+            if (chart2WarnEl) chart2WarnEl.classList.add('hidden');
+            if (window.chartInstances && window.chartInstances['chart2']) {
+                try {
+                    window.chartInstances['chart2'].destroy();
+                } catch(e) {}
+                delete window.chartInstances['chart2'];
+            }
+        } else {
+            if (chart2El) chart2El.classList.remove('hidden');
+            if (chart2EmptyEl) chart2EmptyEl.classList.add('hidden');
+            if (chart2WarnEl) {
+                const hasNull = Object.values(rrAllData).includes(null);
+                if (rrMode === 'manpower_rasio' && hasNull) {
+                    chart2WarnEl.classList.remove('hidden');
+                } else {
+                    chart2WarnEl.classList.add('hidden');
+                }
+            }
+
+            const rrColorMap = {
+                'AREA LHD': '#002060',
+                'Operation': '#5B9BD5',
+                'Maintenance': '#ED7D31',
+                'HSSE': '#A5A5A5',
+                'Business Support': '#FFC000'
+            };
+            const rrBgColors = rrLabels.map(l => rrColorMap[l] || '#9CA3AF');
+
+            if (chart2El) {
+                getOrCreateChart('chart2', {
+                    type: 'bar',
+                    data: { 
+                        labels: rrLabels, 
+                        datasets: [{ 
+                            data: rrValues, 
+                            backgroundColor: rrBgColors,
+                            borderRadius: 4,
+                        }] 
+                    },
+                    options: { 
+                        ...commonOptions, 
+                        indexAxis: 'y', 
+                        plugins: { 
+                            legend: { display: false },
+                            tooltip: {
+                                titleFont: {
+                                    size: 15,
+                                    weight: 'bold',
+                                    family: "'Inter', sans-serif"
+                                },
+                                bodyFont: {
+                                    size: 14,
+                                    weight: 'bold',
+                                    family: "'Inter', sans-serif"
+                                },
+                                padding: 12,
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const val = ctx.raw;
+                                        return rrMode === 'manpower_rasio'
+                                            ? ` ${val} (temuan YTD ÷ manpower × bulan)`
+                                            : ` ${val}`;
+                                    }
                                 }
                             }
-                        }
-                    },
-                    scales: { 
-                        x: { 
-                            beginAtZero: true, 
-                            grid: { display: false },
-                            ticks: {
-                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
-                                color: '#1e293b'
+                        },
+                        scales: { 
+                            x: { 
+                                beginAtZero: true, 
+                                grid: { display: false },
+                                ticks: {
+                                    font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                    color: '#1e293b'
+                                }
+                            },
+                            y: { 
+                                grid: { display: false },
+                                ticks: {
+                                    font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                                    color: '#1e293b'
+                                }
                             }
                         },
-                        y: { 
-                            grid: { display: false },
-                            ticks: {
-                                font: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
-                                color: '#1e293b'
+                        animation: {
+                            onComplete: function() {
+                                var chartInstance = this;
+                                var ctx = chartInstance.ctx;
+                                ctx.font = "bold 14px 'Inter', sans-serif";
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillStyle = '#1e293b';
+
+                                this.data.datasets.forEach(function (dataset, i) {
+                                    var meta = chartInstance.getDatasetMeta(i);
+                                    meta.data.forEach(function (bar, index) {
+                                        var data = dataset.data[index];
+                                        var label = rrMode === 'manpower_rasio' ? data : data;
+                                        ctx.fillText(label, bar.x + 5, bar.y);
+                                    });
+                                });
                             }
                         }
-                    },
-                    animation: {
-                        onComplete: function() {
-                            var chartInstance = this;
-                            var ctx = chartInstance.ctx;
-                            ctx.font = "bold 14px 'Inter', sans-serif";
-                            ctx.textAlign = 'left';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillStyle = '#1e293b';
-
-                            this.data.datasets.forEach(function (dataset, i) {
-                                var meta = chartInstance.getDatasetMeta(i);
-                                meta.data.forEach(function (bar, index) {
-                                    var data = dataset.data[index];
-                                    var label = rrMode === 'manpower_rasio' ? data : data;
-                                    ctx.fillText(label, bar.x + 5, bar.y);
-                                });
-                            });
-                        }
                     }
-                }
-            });
+                });
+            }
         }
 
         // ================================================================
@@ -776,7 +881,7 @@
             // ---- Render Chart.js (mixed: bar + line) ---------------------
             const trendCanvas = document.getElementById('chartTrending');
             if (trendCanvas) {
-                const chartInstance = new Chart(trendCanvas, {
+                const chartInstance = getOrCreateChart('chartTrending', {
                     type: 'bar',
                     plugins: [totalBgPlugin],
                     data: {
@@ -938,7 +1043,7 @@
         const chart3Values = getValues(charts.kategori);
         const chart3Total = chart3Values.reduce((a, b) => a + b, 0);
 
-        new Chart(document.getElementById('chart3'), {
+        getOrCreateChart('chart3', {
             type: 'pie',
             plugins: [ChartDataLabels],
             data: { 
@@ -1048,23 +1153,25 @@
             const someNull = invLabels.some(k  => invRaw[k] === null);
 
             // ---- Tampilkan notice yang sesuai --------------------------------
-            if (notice4) {
-                if (allNull) {
-                    // Semua null: bulan belum dipilih atau manpower belum ada
-                    // (pesan "pilih bulan" ditampilkan oleh Blade jika bulan = null;
-                    //  JS hanya menampilkan pesan manpower jika bulan sudah dipilih)
-                    const selectedMonth = {{ $selectedMonth ?? 'null' }};
-                    if (selectedMonth) {
-                        // Bulan sudah dipilih tapi manpower belum ada
+            const bladeNotice4 = document.getElementById('chart4-blade-notice');
+            const activeMonth = (dataExtra && dataExtra.koMonth !== undefined) ? dataExtra.koMonth : @json($koMonth ?? null);
+
+            if (activeMonth === null) {
+                if (bladeNotice4) bladeNotice4.classList.remove('hidden');
+                if (notice4) notice4.classList.add('hidden');
+            } else {
+                if (bladeNotice4) bladeNotice4.classList.add('hidden');
+                if (notice4) {
+                    if (allNull) {
                         notice4.innerHTML = '⚠️ Data manpower belum tersedia untuk periode ini. Pastikan data manpower sudah diinput di menu <strong>Master Manpower</strong>.';
                         notice4.classList.remove('hidden');
+                    } else if (someNull) {
+                        const missingFungsi = invLabels.filter(k => invRaw[k] === null).join(', ');
+                        notice4.innerHTML = `⚠️ Manpower belum tersedia untuk: <strong>${missingFungsi}</strong>. Fungsi lain ditampilkan normal.`;
+                        notice4.classList.remove('hidden');
+                    } else {
+                        notice4.classList.add('hidden');
                     }
-                    // Jika bulan null, Blade sudah menampilkan notice "Pilih Bulan"
-                } else if (someNull) {
-                    // Sebagian fungsi tidak ada manpower
-                    const missingFungsi = invLabels.filter(k => invRaw[k] === null).join(', ');
-                    notice4.innerHTML = `⚠️ Manpower belum tersedia untuk: <strong>${missingFungsi}</strong>. Fungsi lain ditampilkan normal.`;
-                    notice4.classList.remove('hidden');
                 }
             }
 
@@ -1079,7 +1186,7 @@
             const sisBgColors = invLabels.map(k => invRaw[k] !== null ? '#5AA2D7'  : '#E2E8F0');
 
             // ---- Render Chart ------------------------------------------------
-            new Chart(document.getElementById('chart4'), {
+            getOrCreateChart('chart4', {
                 type: 'bar',
                 plugins: [ChartDataLabels],
                 data: {
@@ -1139,12 +1246,15 @@
                         const key = invLabels[el.index];
                         if (!key) return;
 
-                        // Status "belum pernah melapor" dihitung dari seluruh riwayat SIPEKA,
-                        // sehingga modal tidak memerlukan filter bulan/tahun.
-                        if (typeof window.openUnreportedModal === 'function') {
-                            window.openUnreportedModal(key);
+                        if (el.datasetIndex === 0) {
+                            if (typeof window.openReportedModal === 'function') {
+                                window.openReportedModal(key);
+                            }
+                        } else {
+                            if (typeof window.openUnreportedModal === 'function') {
+                                window.openUnreportedModal(key);
+                            }
                         }
-
                     },
                     scales: {
                         x: { 
@@ -1214,7 +1324,7 @@
         const closedData = ptLabels.map(l => charts.persentase_fungsi[l].closed);
         const openData = ptLabels.map(l => charts.persentase_fungsi[l].open);
         
-        new Chart(document.getElementById('chart5'), {
+        getOrCreateChart('chart5', {
             type: 'bar',
             plugins: [ChartDataLabels],
             data: {
@@ -1319,10 +1429,16 @@
         if (chart6Total === 0) {
             if (chart6El) chart6El.classList.add('hidden');
             if (chart6EmptyEl) chart6EmptyEl.classList.remove('hidden');
+            if (window.chartInstances['chart6']) {
+                window.chartInstances['chart6'].destroy();
+                delete window.chartInstances['chart6'];
+            }
         } else {
+            if (chart6El) chart6El.classList.remove('hidden');
+            if (chart6EmptyEl) chart6EmptyEl.classList.add('hidden');
             const chart6Labels = getLabels(charts.tindak_lanjut);
             const chart6BgColors = getBgColors(chart6Labels);
-            new Chart(chart6El, {
+            getOrCreateChart('chart6', {
                 type: 'doughnut',
                 plugins: [ChartDataLabels],
                 data: { 
@@ -1385,6 +1501,7 @@
         // Helper for Horizontal Bar charts with Data Labels (Percentages & Counts)
         // Urutan kategori mengikuti backend (PHP array order) — TIDAK di-sort by value.
         const renderHorizontalBar = (ctxId, chartData, color) => {
+            if (!chartData || !chartData.data) return;
             // Pertahankan urutan dari backend (PHP array order)
             let dataArr = Object.entries(chartData.data)
                 .map(([k, v]) => ({ label: k, value: v }));
@@ -1392,7 +1509,7 @@
             
             const total = chartData.total || 1; // Prevent division by zero
             
-            new Chart(document.getElementById(ctxId), {
+            getOrCreateChart(ctxId, {
                 type: 'bar',
                 plugins: [ChartDataLabels],
                 data: { 
@@ -1489,6 +1606,177 @@
 
         // 8. Horizontal Bar - Unsafe Condition
         renderHorizontalBar('chart8', charts.unsafe_condition, '#ED7D31');
-    });
+    };
+
+    // Render initial charts on page load
+    window.renderAllCharts(initialCharts);
+
+    // ================================================================
+    // AJAX FILTER HANDLING
+    // ================================================================
+    let activeAbortController = null;
+    let currentRequestId = 0;
+
+    function showDashboardLoading(show) {
+        const el = document.getElementById('dashboard-loading-indicator');
+        if (el) {
+            if (show) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        }
+    }
+
+    function showDashboardError(msg) {
+        const toast = document.getElementById('dashboard-error-toast');
+        const msgEl = document.getElementById('dashboard-error-msg');
+        if (toast && msgEl) {
+            msgEl.textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 5000);
+        }
+    }
+
+    function updateKpi(kpi) {
+        if (!kpi) return;
+        const totalEl = document.getElementById('kpi-total');
+        const openEl = document.getElementById('kpi-open');
+        const closedEl = document.getElementById('kpi-closed');
+        if (totalEl) totalEl.textContent = Number(kpi.total || 0).toLocaleString('id-ID');
+        if (openEl) openEl.textContent = Number(kpi.open || 0).toLocaleString('id-ID');
+        if (closedEl) closedEl.textContent = Number(kpi.closed || 0).toLocaleString('id-ID');
+    }
+
+    function fetchDashboard(params = {}) {
+        if (activeAbortController) {
+            activeAbortController.abort();
+        }
+        activeAbortController = new AbortController();
+        const reqId = ++currentRequestId;
+        showDashboardLoading(true);
+
+        const currentUrl = new URL(window.location.href);
+        Object.keys(params).forEach(k => {
+            if (params[k] === null || params[k] === '') {
+                currentUrl.searchParams.delete(k);
+            } else {
+                currentUrl.searchParams.set(k, params[k]);
+            }
+        });
+
+        const fetchUrl = currentUrl.pathname + currentUrl.search;
+
+        fetch(fetchUrl, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            signal: activeAbortController.signal
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            if (reqId !== currentRequestId) return;
+            showDashboardLoading(false);
+            if (!data.success) throw new Error(data.message || 'Gagal memuat data');
+
+            updateKpi(data.kpi);
+
+            if (data.koYear !== undefined && koYearFilter && String(data.koYear) !== koYearFilter.value) {
+                koYearFilter.value = data.koYear || '';
+            }
+            if (data.koMonth !== undefined && koMonthFilter && String(data.koMonth) !== koMonthFilter.value) {
+                koMonthFilter.value = data.koMonth || '';
+            }
+            if (data.rrYear !== undefined && rrYearFilter && String(data.rrYear) !== rrYearFilter.value) {
+                rrYearFilter.value = data.rrYear || '';
+            }
+            if (data.rrMonth !== undefined && rrMonthFilter && String(data.rrMonth) !== rrMonthFilter.value) {
+                rrMonthFilter.value = data.rrMonth || '';
+            }
+            if (data.selectedPekaYear !== undefined && pekaYearFilter && String(data.selectedPekaYear) !== pekaYearFilter.value) {
+                pekaYearFilter.value = data.selectedPekaYear || '';
+            }
+
+            // Update Chart 2 Title & Subtitle
+            if (data.charts && data.charts.reporting) {
+                const rTitle = document.getElementById('chart2-title');
+                const rSub   = document.getElementById('chart2-subtitle');
+                const rMode  = data.charts.reporting.mode || 'distribusi';
+                if (rTitle) {
+                    if (rMode === 'manpower_rasio') {
+                        const rBulanNama = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                        const rMonthName = data.rrMonth ? (rBulanNama[data.rrMonth] || '') : (data.selectedMonth ? (rBulanNama[data.selectedMonth] || '') : '');
+                        const rPeriod = rMonthName ? (rMonthName + ' ' + (data.rrYear || data.selectedYear || '')) : (data.charts.reporting.periode_label || '');
+                        rTitle.textContent = '2. Reporting Rate per Fungsi (' + rPeriod + ')';
+                    } else {
+                        rTitle.textContent = '2. Reporting Rate per Fungsi';
+                    }
+                }
+                if (rSub) {
+                    rSub.textContent = (rMode === 'manpower_rasio')
+                        ? 'temuan YTD ÷ (manpower × bulan)'
+                        : 'jumlah pelaporan ÷ manpower tahunan';
+                }
+            }
+
+            window.renderAllCharts(data.charts, data);
+
+            window.history.replaceState({}, '', fetchUrl);
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') return;
+            showDashboardLoading(false);
+            console.error('AJAX dashboard filter error:', err);
+            showDashboardError('Gagal memuat data filter (' + (err.message || 'Error') + '). Data sebelumnya tetap dipertahankan.');
+        });
+    }
+
+    // Attach event listeners
+    const rrYearFilter = document.getElementById('rr-year-filter');
+    if (rrYearFilter) {
+        rrYearFilter.onchange = null;
+        rrYearFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchDashboard({ rr_year: this.value });
+        });
+    }
+
+    const rrMonthFilter = document.getElementById('rr-month-filter');
+    if (rrMonthFilter) {
+        rrMonthFilter.onchange = null;
+        rrMonthFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchDashboard({ rr_month: this.value });
+        });
+    }
+
+    const pekaYearFilter = document.getElementById('peka-year-filter');
+    if (pekaYearFilter) {
+        pekaYearFilter.onchange = null;
+        pekaYearFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchDashboard({ peka_year: this.value });
+        });
+    }
+
+    const koYearFilter = document.getElementById('ko-year-filter');
+    if (koYearFilter) {
+        koYearFilter.onchange = null;
+        koYearFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchDashboard({ ko_year: this.value });
+        });
+    }
+
+    const koMonthFilter = document.getElementById('ko-month-filter');
+    if (koMonthFilter) {
+        koMonthFilter.onchange = null;
+        koMonthFilter.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchDashboard({ ko_month: this.value });
+        });
+    }
+});
 </script>
 @endpush

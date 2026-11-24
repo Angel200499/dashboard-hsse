@@ -58,6 +58,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/rekap-pelapor', [DashboardFunctionController::class, 'rekapPelapor'])
          ->name('dashboard.rekap-pelapor');
 
+    // Endpoint data JSON untuk filter AJAX Dashboard Function
+    Route::get('/dashboard/fungsi/{nama_fungsi}/data', [DashboardFunctionController::class, 'chartData'])
+         ->name('dashboard.fungsi.data');
+
     // Dashboard Function — semua role bisa akses (otorisasi di controller)
     Route::get('/dashboard/fungsi/{nama_fungsi?}', [DashboardFunctionController::class, 'index'])
          ->name('dashboard.fungsi');
@@ -97,6 +101,12 @@ Route::middleware('auth')->group(function () {
          ->name('unreported-personil.data');
     Route::get('/unreported-personil/export', [UnreportedPersonilController::class, 'export'])
          ->name('unreported-personil.export');
+
+    // Daftar Sudah Melapor (Modal & Export) — mirror dari Belum Melapor
+    Route::get('/reported-personil/data', [UnreportedPersonilController::class, 'reportedData'])
+         ->name('reported-personil.data');
+    Route::get('/reported-personil/export', [UnreportedPersonilController::class, 'reportedExport'])
+         ->name('reported-personil.export');
 
     // -----------------------------------------------------------------
     // Admin HSSE Only — Import & User Management

@@ -94,6 +94,22 @@ class SipekaFinding extends Model
     }
 
     /**
+     * Ambil tahun terakhir yang benar-benar memiliki data temuan SIPEKA (global, tanpa filter fungsi).
+     * Digunakan sebagai default tahun dinamis agar tidak default ke tahun berjalan yang belum ada datanya.
+     *
+     * @return int|null  Tahun terakhir yang ada datanya (mis. 2025), atau null jika tabel kosong
+     */
+    public static function maxTahun(): ?int
+    {
+        $tc  = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+        $row = static::query()
+            ->selectRaw("MAX(YEAR(STR_TO_DATE(NULLIF({$tc}, ''), '%Y-%m-%d %H:%i'))) AS max_tahun")
+            ->first();
+
+        return $row?->max_tahun !== null ? (int) $row->max_tahun : null;
+    }
+
+    /**
      * Ambil bulan terakhir yang memiliki data SIPEKA aktual untuk fungsi tertentu pada tahun tertentu.
      *
      * Digunakan oleh Dashboard Per Fungsi untuk:

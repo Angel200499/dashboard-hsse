@@ -1,0 +1,70 @@
+/* =========================================================
+   DETAIL TEMUAN (resources/views/pages/findings/show.blade.php)
+   ---------------------------------------------------------
+   Catatan:
+   - typography.css mendefinisikan h1/h2 secara global (32px/28px)
+     tanpa cascade layer, sehingga selalu mengalahkan utility
+     Tailwind v4 (@layer utilities). Skala tipografi halaman ini
+     karena itu didefinisikan lewat class ber-scope `.finding-detail`.
+   - Skala desktop: 1366px  -> judul 22 / heading 17 / label 13 / nilai 15
+                    >=1536px -> judul 24 / heading 18 / label 14 / nilai 16
+========================================================= */
+
+.finding-detail .fd-title{
+    font-size:22px;
+    line-height:1.25;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    color:#1E293B;               /* slate-800 */
+}
+
+.finding-detail .fd-heading{
+    font-size:17px;
+    line-height:1.3;
+    font-weight:700;
+    color:#1E293B;               /* slate-800 */
+}
+
+.finding-detail .fd-label{
+    display:block;
+    font-size:13px;
+    line-height:1.35;
+    font-weight:600;
+    color:#475569;               /* slate-600, kontras 7.5:1 di atas putih */
+}
+
+.finding-detail .fd-value{
+    font-size:15px;
+    line-height:1.45;
+    font-weight:500;
+    color:#0F172A;               /* slate-900 */
+    overflow-wrap:anywhere;      /* teks panjang turun baris, tidak terpotong */
+}
+
+/* Teks panjang (deskripsi / keterangan): tampil utuh, tanpa scroll internal */
+.finding-detail .fd-text{
+    font-size:15px;
+    line-height:1.6;
+    font-weight:400;
+    color:#0F172A;
+    white-space:pre-line;
+    overflow-wrap:anywhere;
+}
+
+@media (min-width:1536px){
+    .finding-detail .fd-title{ font-size:24px; }
+    .finding-detail .fd-heading{ font-size:18px; }
+    .finding-detail .fd-label{ font-size:14px; }
+    .finding-detail .fd-value,
+    .finding-detail .fd-text{ font-size:16px; }
+}
+
+/* Desktop: isi tinggi area konten agar tidak ada ruang kosong berlebih
+   di atas footer. 172px = navbar 64 + padding container 48 + footer 59 + 1px
+   toleransi pembulatan. Ini min-height (bukan fixed height), sehingga konten
+   yang panjang tetap tampil utuh dan halaman bergulir secara normal. */
+@media (min-width:1024px){
+    .finding-detail{
+        min-height:calc(100vh - 172px);
+    }
+}

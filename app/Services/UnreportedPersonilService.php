@@ -132,6 +132,85 @@ class UnreportedPersonilService
     }
 
     /**
+     * Personil aktif yang SUDAH PERNAH melapor + ringkasan.
+     * Mirror dari resolve(), tetapi mengambil yang ADA di $reportedIds.
+     *
+     * @return array{reported: Collection<int, MasterPersonil>, summary: array}
+     */
+    protected function resolveReported(string $fungsi): array
+    {
+        $resolution  = $this->resolver->resolve();
+        $reportedIds = $resolution['reported_ids'];
+
+        $query = MasterPersonil::active();
+        if ($fungsi === self::SCOPE_ALL) {
+            $query->whereIn('fungsi', MasterPersonil::FUNGSI_LIST);
+        } else {
+            $query->byFungsi($fungsi);
+        }
+
+        $active = $query->get()
+            ->sortBy(fn (MasterPersonil $p) => self::normalizeName($p->nama))
+            ->values();
+
+        $reported = $active
+            ->filter(fn (MasterPersonil $p) => isset($reportedIds[$p->id]))
+            ->values();
+
+        return [
+            'reported' => $reported,
+            'summary'  => [
+                'total_active'     => $active->count(),
+                'total_unreported' => $active->count() - $reported->count(),
+                'total_reported'   => $reported->count(),
+                'unmatched_sipeka' => [],
+            ],
+        ];
+    }
+
+    /**
+     * Data modal: personil sudah pernah melapor (paginasi) + summary + meta.
+     */
+    public function getReportedPersonils(
+        string $fungsi,
+        ?string $search = null,
+        ?string $tipe = null,
+        int $perPage = 10,
+        int $page = 1
+    ): array {
+        $resolved = $this->resolveReported($fungsi);
+        $filtered = $this->applyFilters($resolved['reported'], $search, $tipe);
+
+        $paginator = new LengthAwarePaginator(
+            $filtered->forPage($page, $perPage)->values(),
+            $filtered->count(),
+            $perPage,
+            $page
+        );
+
+        return [
+            'paginator' => $paginator,
+            'summary'   => $resolved['summary'],
+            'meta'      => [
+                'fungsi'       => $fungsi,
+                'scope_label'  => 'Seluruh riwayat data SIPEKA yang tersedia',
+                'sipeka_range' => $this->getSipekaRangeLabel(),
+            ],
+        ];
+    }
+
+    /**
+     * Seluruh record personil sudah melapor (sesuai search/filter) untuk export.
+     */
+    public function getReportedForExport(
+        string $fungsi,
+        ?string $search = null,
+        ?string $tipe = null
+    ): Collection {
+        return $this->applyFilters($this->resolveReported($fungsi)['reported'], $search, $tipe);
+    }
+
+    /**
      * Data modal: personil belum pernah melapor (paginasi) + summary + meta.
      */
     public function getUnreportedPersonils(

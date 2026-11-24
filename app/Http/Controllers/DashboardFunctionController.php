@@ -100,19 +100,22 @@ class DashboardFunctionController extends Controller
         // -----------------------------------------------------------------
         // FILTER MANDIRI & DEFAULT OTOMATIS: KETERLIBATAN OBSERVASI (CARD 4)
         // -----------------------------------------------------------------
+        // Ambil tahun data SIPEKA terakhir secara global (sekali query, dipakai untuk semua default).
+        // Ini memastikan default tidak terkunci ke now()->year jika tahun berjalan belum ada data.
+        $latestDataYear = SipekaFinding::maxTahun();
+
         // 1. Tahun Keterlibatan (ko_year):
         //    Jika user mengirim ko_year, gunakan.
-        //    Jika tidak ada ko_year, default ke tahun berjalan (now()->year).
+        //    Jika tidak ada ko_year, default ke tahun filter ($tahun) atau tahun data SIPEKA terakhir.
         $koYearRaw = $request->get('ko_year');
         if ($koYearRaw !== null && preg_match('/^\d{4}$/', $koYearRaw)) {
             $koYear = (int) $koYearRaw;
         } else {
-            // Default dinamis: tahun berjalan
-            $koYear = (int) now()->year;
+            $koYear = $tahun ?? $latestDataYear;
         }
 
         // 2. Bulan terakhir yang memiliki data SIPEKA untuk fungsi ini pada tahun $koYear
-        $koMaxBulan = SipekaFinding::maxBulanTahunFungsi($koYear, $fungsi);
+        $koMaxBulan = $koYear ? SipekaFinding::maxBulanTahunFungsi($koYear, $fungsi) : null;
 
         // 3. Bulan Keterlibatan (ko_month):
         //    - Jika user mengirim parameter ko_month:
@@ -161,17 +164,16 @@ class DashboardFunctionController extends Controller
         // -----------------------------------------------------------------
         // 1. Tahun Reporting Rate (rr_year):
         //    Jika user mengirim rr_year, gunakan.
-        //    Jika tidak ada rr_year, default ke tahun berjalan (now()->year).
+        //    Jika tidak ada rr_year, default ke tahun data SIPEKA terakhir.
         $rrYearRaw = $request->get('rr_year');
         if ($rrYearRaw !== null && preg_match('/^\d{4}$/', $rrYearRaw)) {
             $rrYear = (int) $rrYearRaw;
         } else {
-            // Default dinamis: tahun berjalan
-            $rrYear = (int) now()->year;
+            $rrYear = $tahun ?? $latestDataYear;
         }
 
         // 2. Bulan terakhir yang memiliki data SIPEKA untuk fungsi ini pada tahun $rrYear
-        $rrMaxBulan = SipekaFinding::maxBulanTahunFungsi($rrYear, $fungsi);
+        $rrMaxBulan = $rrYear ? SipekaFinding::maxBulanTahunFungsi($rrYear, $fungsi) : null;
 
         // 3. Bulan Reporting Rate (rr_month):
         //    - Jika user mengirim parameter rr_month:
@@ -197,12 +199,12 @@ class DashboardFunctionController extends Controller
         //    - 'all_months' : user sengaja memilih "Semua Bulan" (mode distribusi)
         //    - 'ok'         : data SIPEKA dan manpower tersedia
         $rrStatus = 'ok';
-        if ($rrMaxBulan === null) {
-            // Tahun yang dipilih sama sekali tidak memiliki data SIPEKA untuk fungsi ini
-            $rrStatus = 'no_sipeka';
-        } elseif ($request->has('rr_month') && ($request->get('rr_month') === '' || $request->get('rr_month') === null)) {
+        if ($request->has('rr_month') && ($request->get('rr_month') === '' || $request->get('rr_month') === null)) {
             // User secara eksplisit memilih "Semua Bulan"
             $rrStatus = 'all_months';
+        } elseif ($rrMaxBulan === null) {
+            // Tahun yang dipilih sama sekali tidak memiliki data SIPEKA untuk fungsi ini
+            $rrStatus = 'no_sipeka';
         } elseif ($rrMonth === null) {
             $rrStatus = 'no_sipeka';
         } elseif ($rrMonth > $rrMaxBulan) {
@@ -306,7 +308,7 @@ class DashboardFunctionController extends Controller
         $gPekaYearRaw = $request->get('g_peka_year');
         $gPekaYear    = ($gPekaYearRaw && preg_match('/^\d{4}$/', $gPekaYearRaw))
                         ? (int) $gPekaYearRaw
-                        : ($gYear ?? (int) now()->year);
+                        : ($gYear ?? $latestDataYear ?? (int) now()->year);
 
         // Max bulan SIPEKA global untuk tahun global
         $gMaxBulanSipeka = $gYear ? SipekaFinding::maxBulanTahun($gYear) : null;
@@ -318,7 +320,9 @@ class DashboardFunctionController extends Controller
         $gRrYearRaw = $request->get('g_rr_year');
         $gRrYear    = ($gRrYearRaw && preg_match('/^\d{4}$/', $gRrYearRaw))
                       ? (int) $gRrYearRaw
-                      : (int) now()->year;
+                      : ($gYear ?? $latestDataYear);
+
+        $gRrMaxBulan = $gRrYear ? SipekaFinding::maxBulanTahun($gRrYear) : null;
 
         // Filter rr_month global (g_rr_month)
         if ($request->has('g_rr_month')) {
@@ -327,14 +331,16 @@ class DashboardFunctionController extends Controller
                         ? (int) $gRrMonthRaw
                         : null;
         } else {
-            $gRrMonth = SipekaFinding::maxBulanTahun($gRrYear);
+            $gRrMonth = $gRrMaxBulan;
         }
 
         // Filter ko_year global (g_ko_year) — untuk Keterlibatan Observasi global
         $gKoYearRaw = $request->get('g_ko_year');
         $gKoYear    = ($gKoYearRaw && preg_match('/^\d{4}$/', $gKoYearRaw))
                       ? (int) $gKoYearRaw
-                      : (int) now()->year;
+                      : ($gYear ?? $latestDataYear);
+
+        $gKoMaxBulan = $gKoYear ? SipekaFinding::maxBulanTahun($gKoYear) : null;
 
         // Filter ko_month global (g_ko_month)
         if ($request->has('g_ko_month')) {
@@ -343,7 +349,7 @@ class DashboardFunctionController extends Controller
                         ? (int) $gKoMonthRaw
                         : null;
         } else {
-            $gKoMonth = SipekaFinding::maxBulanTahun($gKoYear);
+            $gKoMonth = $gKoMaxBulan;
         }
 
         // Status global Keterlibatan
@@ -360,11 +366,13 @@ class DashboardFunctionController extends Controller
         // Status global Reporting Rate
         $gRrMaxBulan = SipekaFinding::maxBulanTahun($gRrYear);
         $gRrStatus = 'ok';
-        if ($gRrMaxBulan === null) {
-            $gRrStatus = 'no_sipeka';
-        } elseif ($request->has('g_rr_month') && ($request->get('g_rr_month') === '' || $request->get('g_rr_month') === null)) {
+        if ($request->has('g_rr_month') && ($request->get('g_rr_month') === '' || $request->get('g_rr_month') === null)) {
             $gRrStatus = 'all_months';
+        } elseif ($gRrMaxBulan === null) {
+            $gRrStatus = 'no_sipeka';
         } elseif ($gRrMonth === null) {
+            $gRrStatus = 'no_sipeka';
+        } elseif ($gRrMaxBulan !== null && $gRrMonth > $gRrMaxBulan) {
             $gRrStatus = 'no_sipeka';
         }
 
@@ -409,6 +417,57 @@ class DashboardFunctionController extends Controller
         $tableQuery        = $applyFungsiFilter(SipekaFinding::query());
         $findingsPaginated = $this->queryService->paginate($tableQuery, $request);
 
+        // -----------------------------------------------------------------
+        // Response JSON untuk Filter AJAX / Fetch
+        // -----------------------------------------------------------------
+        if ($request->wantsJson() || $request->ajax()) {
+            $activeTab = $request->get('tab') === 'global' ? 'global' : 'fungsi';
+            $fungsiColors = [
+                'Operation'        => ['bg' => 'bg-blue-50', 'text' => 'text-[#5AA2D7]', 'border' => 'border-blue-200', 'hex' => '#5AA2D7'],
+                'Maintenance'      => ['bg' => 'bg-amber-50', 'text' => 'text-[#ED7D31]', 'border' => 'border-amber-200', 'hex' => '#ED7D31'],
+                'HSSE'             => ['bg' => 'bg-slate-50', 'text' => 'text-[#708090]', 'border' => 'border-slate-200', 'hex' => '#A5A5A5'],
+                'Business Support' => ['bg' => 'bg-yellow-50', 'text' => 'text-[#FFC000]', 'border' => 'border-yellow-200', 'hex' => '#FFC000'],
+            ];
+            $currentColor = $fungsiColors[$fungsi] ?? ['bg' => 'bg-blue-50', 'text' => 'text-blue-600', 'border' => 'border-blue-200', 'hex' => '#5AA2D7'];
+            $fungsiSapPct = (int) ($globalCharts['tindak_lanjut'][$fungsi] ?? 0);
+
+            return response()->json([
+                'success'         => true,
+                'activeTab'       => $activeTab,
+                'fungsi'          => $fungsi,
+                'currentColor'    => $currentColor,
+                'fungsiSapPct'    => $fungsiSapPct,
+                'kpi'             => $kpi,
+                'charts'          => $charts,
+                'globalCharts'    => $globalCharts,
+                'globalKpi'       => $globalKpi,
+                'selectedYear'    => $selectedYear,
+                'selectedMonth'   => $selectedMonth,
+                'maxBulanSipeka'  => $maxBulanSipeka,
+                'koYear'          => $koYear,
+                'koMonth'         => $koMonth,
+                'koStatus'        => $koStatus,
+                'koMaxBulan'      => $koMaxBulan,
+                'rrYear'          => $rrYear,
+                'rrMonth'         => $rrMonth,
+                'rrStatus'        => $rrStatus,
+                'rrMaxBulan'      => $rrMaxBulan,
+                'gYear'           => $gYear,
+                'gMonth'          => $gMonth,
+                'gPekaYear'       => $gPekaYear,
+                'gRrYear'         => $gRrYear,
+                'gRrMonth'        => $gRrMonth,
+                'gRrStatus'       => $gRrStatus,
+                'gRrMaxBulan'     => $gRrMaxBulan,
+                'gKoYear'         => $gKoYear,
+                'gKoMonth'        => $gKoMonth,
+                'gKoStatus'       => $gKoStatus,
+                'gKoMaxBulan'     => $gKoMaxBulan,
+                'gMaxBulanSipeka' => $gMaxBulanSipeka,
+                'latestDataYear'  => $latestDataYear,
+            ]);
+        }
+
         return view('pages.dashboard-fungsi', compact(
             'kpi',
             'charts',
@@ -417,6 +476,7 @@ class DashboardFunctionController extends Controller
             'selectedYear',
             'selectedMonth',
             'maxBulanSipeka',   // batas atas bulan Reporting Rate berdasarkan data SIPEKA aktual
+            'latestDataYear',
             'koYear',
             'koMonth',
             'koStatus',
@@ -631,6 +691,15 @@ class DashboardFunctionController extends Controller
         };
 
         return "rekap-pelapor-{$slug}-{$suffix}.pdf";
+    }
+
+    /**
+     * Endpoint JSON data chart & KPI untuk filter AJAX.
+     */
+    public function chartData(Request $request, ?string $nama_fungsi = null)
+    {
+        $request->headers->set('Accept', 'application/json');
+        return $this->index($request, $nama_fungsi);
     }
 }
 
