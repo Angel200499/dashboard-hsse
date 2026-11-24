@@ -110,6 +110,55 @@ class SipekaFinding extends Model
     }
 
     /**
+     * Ambil daftar tahun unik yang memiliki data SIPEKA, ditambah satu tahun setelah tahun data terbaru.
+     * Diurutkan descending (terbaru ke terlama).
+     *
+     * Contoh:
+     * - Data hanya ada 2026 => [2027, 2026]
+     * - Data ada 2026 dan 2027 => [2028, 2027, 2026]
+     *
+     * @return int[]
+     */
+    public static function getTahunList(): array
+    {
+        $tc = "JSON_UNQUOTE(JSON_EXTRACT(data_sipeka, '$.tanggal'))";
+        $years = static::query()
+            ->selectRaw("DISTINCT YEAR(STR_TO_DATE(NULLIF({$tc}, ''), '%Y-%m-%d %H:%i')) AS yr")
+            ->whereNotNull(DB::raw("STR_TO_DATE(NULLIF({$tc}, ''), '%Y-%m-%d %H:%i')"))
+            ->pluck('yr')
+            ->filter()
+            ->map(fn($y) => (int) $y)
+            ->unique()
+            ->values()
+            ->toArray();
+
+        if (empty($years)) {
+            $curr = (int) now()->year;
+            return [$curr + 1, $curr];
+        }
+
+        $maxYear = max($years);
+        $nextYear = $maxYear + 1;
+        if (!in_array($nextYear, $years, true)) {
+            $years[] = $nextYear;
+        }
+
+        rsort($years);
+
+        return array_values($years);
+    }
+
+    /**
+     * Alias untuk getTahunList().
+     *
+     * @return int[]
+     */
+    public static function tahunList(): array
+    {
+        return static::getTahunList();
+    }
+
+    /**
      * Ambil bulan terakhir yang memiliki data SIPEKA aktual untuk fungsi tertentu pada tahun tertentu.
      *
      * Digunakan oleh Dashboard Per Fungsi untuk:

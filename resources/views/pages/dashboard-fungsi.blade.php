@@ -53,7 +53,7 @@
                         5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus',
                         9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
                     ];
-                    $tahunList = range(now()->year + 1, 2020);
+                    $tahunList = $tahunList ?? \App\Models\SipekaFinding::getTahunList();
                 @endphp
 
                 @if(request()->has('ko_year'))
@@ -77,20 +77,12 @@
                     @endforeach
                 </select>
 
-                <select name="month" id="filter-month"
-                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
-                    <option value="">Semua Bulan</option>
-                    @foreach($bulanNamaList as $num => $nama)
-                        <option value="{{ $num }}" {{ ($selectedMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
-                    @endforeach
-                </select>
-
                 <div id="filter-loading-indicator" class="hidden flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl animate-pulse">
                     <svg class="animate-spin w-3.5 h-3.5 text-[#9DBF2A]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                     <span>Memuat...</span>
                 </div>
 
-                @if($selectedYear || $selectedMonth || request('search') || request('status_filter') || request('date_filter'))
+                @if($selectedYear || request('search') || request('status_filter') || request('date_filter'))
                     @php
                         $resetHeaderQuery = request()->only(['rr_year', 'rr_month', 'ko_year', 'ko_month']);
                     @endphp
@@ -100,7 +92,7 @@
             @else
             {{-- Global Tab Top Filter --}}
             @php
-                $tahunList = range(now()->year + 1, 2020);
+                $tahunList = $tahunList ?? \App\Models\SipekaFinding::getTahunList();
                 $bulanNamaList = [
                     1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April',
                     5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus',
@@ -120,20 +112,12 @@
                     @endforeach
                 </select>
 
-                <select name="g_month" id="g-filter-month"
-                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
-                    <option value="">Semua Bulan (Global)</option>
-                    @foreach($bulanNamaList as $num => $nama)
-                        <option value="{{ $num }}" {{ ($gMonth ?? null) == $num ? 'selected' : '' }}>{{ $nama }}</option>
-                    @endforeach
-                </select>
-
                 <div id="g-filter-loading-indicator" class="hidden flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl animate-pulse">
                     <svg class="animate-spin w-3.5 h-3.5 text-[#9DBF2A]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                     <span>Memuat...</span>
                 </div>
 
-                @if(request()->has('g_year') || request()->has('g_month') || request()->has('g_rr_year') || request()->has('g_rr_month') || request()->has('g_ko_year') || request()->has('g_ko_month') || request()->has('g_peka_year'))
+                @if(request()->has('g_year') || request()->has('g_rr_year') || request()->has('g_rr_month') || request()->has('g_ko_year') || request()->has('g_ko_month') || request()->has('g_peka_year'))
                     <a href="{{ request()->url() }}?tab=global" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter Global</a>
                 @endif
             </form>
@@ -144,6 +128,7 @@
                 'selectedYear'   => $activeTab === 'global' ? $gYear : $selectedYear,
                 'selectedMonth'  => $activeTab === 'global' ? $gMonth : $selectedMonth,
                 'maxBulanSipeka' => $activeTab === 'global' ? $gMaxBulanSipeka : $maxBulanSipeka,
+                'tahunList'      => $tahunList ?? null,
             ])
         </div>
     </div>
@@ -737,7 +722,7 @@
             5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus',
             9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
         ];
-        $tahunList = range(now()->year + 1, 2020);
+        $tahunList = $tahunList ?? \App\Models\SipekaFinding::getTahunList();
     @endphp
 
     {{-- Global KPI Cards --}}
@@ -1860,9 +1845,20 @@
         // 6. Donut Chart - Rekap Persentase Temuan Ber-SAP (Tab 1 Fungsi)
         const chart6El = document.getElementById('chart6');
         if (chart6El) {
-            const pct = {{ (int) $fungsiSapPct }};
+            let pct = {{ (int) $fungsiSapPct }};
+            if (dataExtra && dataExtra.fungsiSapPct !== undefined && dataExtra.fungsiSapPct !== null && !isNaN(Number(dataExtra.fungsiSapPct))) {
+                pct = Number(dataExtra.fungsiSapPct);
+            } else if (globalCharts && globalCharts.tindak_lanjut && globalCharts.tindak_lanjut['{{ $fungsi }}'] !== undefined && !isNaN(Number(globalCharts.tindak_lanjut['{{ $fungsi }}']))) {
+                pct = Number(globalCharts.tindak_lanjut['{{ $fungsi }}']);
+            }
+            pct = Math.max(0, Math.min(100, Math.round(pct)));
+            const remaining = Math.max(0, Math.min(100, 100 - pct));
             const color = '{{ $currentColor['hex'] }}';
-            const remaining = Math.max(0, 100 - pct);
+
+            const c6Center = document.getElementById('chart6-center-pct');
+            if (c6Center) {
+                c6Center.textContent = pct + '%';
+            }
 
             getOrCreateChart('chart6', {
                 type: 'doughnut',
@@ -2152,9 +2148,6 @@
             if (data.selectedYear !== undefined && filterYear && String(data.selectedYear) !== filterYear.value) {
                 filterYear.value = data.selectedYear || '';
             }
-            if (data.selectedMonth !== undefined && filterMonth && String(data.selectedMonth) !== filterMonth.value) {
-                filterMonth.value = data.selectedMonth || '';
-            }
             if (data.koYear !== undefined && koYearFilter && String(data.koYear) !== koYearFilter.value) {
                 koYearFilter.value = data.koYear || '';
             }
@@ -2207,14 +2200,6 @@
         filterYear.addEventListener('change', function(e) {
             e.preventDefault();
             fetchTab1Dashboard({ year: this.value });
-        });
-    }
-
-    const filterMonth = document.getElementById('filter-month');
-    if (filterMonth) {
-        filterMonth.addEventListener('change', function(e) {
-            e.preventDefault();
-            fetchTab1Dashboard({ month: this.value });
         });
     }
 
@@ -3225,9 +3210,6 @@
             if (data.gYear !== undefined && gFilterYear && String(data.gYear) !== gFilterYear.value) {
                 gFilterYear.value = data.gYear || '';
             }
-            if (data.gMonth !== undefined && gFilterMonth && String(data.gMonth) !== gFilterMonth.value) {
-                gFilterMonth.value = data.gMonth || '';
-            }
             if (data.gKoYear !== undefined && gKoYear && String(data.gKoYear) !== gKoYear.value) {
                 gKoYear.value = data.gKoYear || '';
             }
@@ -3283,14 +3265,6 @@
         gFilterYear.addEventListener('change', function(e) {
             e.preventDefault();
             fetchTab2Dashboard({ g_year: this.value });
-        });
-    }
-
-    const gFilterMonth = document.getElementById('g-filter-month');
-    if (gFilterMonth) {
-        gFilterMonth.addEventListener('change', function(e) {
-            e.preventDefault();
-            fetchTab2Dashboard({ g_month: this.value });
         });
     }
 

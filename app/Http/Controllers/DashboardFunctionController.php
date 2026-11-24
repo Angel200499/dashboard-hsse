@@ -103,6 +103,7 @@ class DashboardFunctionController extends Controller
         // Ambil tahun data SIPEKA terakhir secara global (sekali query, dipakai untuk semua default).
         // Ini memastikan default tidak terkunci ke now()->year jika tahun berjalan belum ada data.
         $latestDataYear = SipekaFinding::maxTahun();
+        $tahunList      = SipekaFinding::getTahunList();
 
         // 1. Tahun Keterlibatan (ko_year):
         //    Jika user mengirim ko_year, gunakan.
@@ -465,6 +466,7 @@ class DashboardFunctionController extends Controller
                 'gKoMaxBulan'     => $gKoMaxBulan,
                 'gMaxBulanSipeka' => $gMaxBulanSipeka,
                 'latestDataYear'  => $latestDataYear,
+                'tahunList'       => $tahunList,
             ]);
         }
 
@@ -477,6 +479,7 @@ class DashboardFunctionController extends Controller
             'selectedMonth',
             'maxBulanSipeka',   // batas atas bulan Reporting Rate berdasarkan data SIPEKA aktual
             'latestDataYear',
+            'tahunList',
             'koYear',
             'koMonth',
             'koStatus',

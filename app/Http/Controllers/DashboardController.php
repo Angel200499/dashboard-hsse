@@ -47,9 +47,10 @@ class DashboardController extends Controller
         }
 
         // -----------------------------------------------------------------
-        // Ambil tahun data SIPEKA terakhir secara global
+        // Ambil tahun data SIPEKA terakhir secara global & daftar tahun opsi
         // -----------------------------------------------------------------
         $latestDataYear = SipekaFinding::maxTahun();
+        $tahunList      = SipekaFinding::getTahunList();
 
         // Filter Tahun mandiri untuk Rekap PEKA
         // Default ke tahun data terbaru agar chart langsung tampil saat pertama buka
@@ -185,6 +186,7 @@ class DashboardController extends Controller
                 'selectedPekaYear' => $selectedPekaYear,
                 'maxBulanSipeka'   => $maxBulanSipeka,
                 'latestDataYear'   => $latestDataYear,
+                'tahunList'        => $tahunList,
                 'koYear'           => $koYear,
                 'koMonth'          => $koMonth,
                 'koMaxBulan'       => $koMaxBulan,
@@ -200,6 +202,7 @@ class DashboardController extends Controller
             'selectedYear', 'selectedMonth', 'selectedPekaYear',
             'maxBulanSipeka',
             'latestDataYear',
+            'tahunList',
             'koYear', 'koMonth', 'koMaxBulan',
             'rrYear', 'rrMonth', 'rrStatus', 'rrMaxBulan'
         ));

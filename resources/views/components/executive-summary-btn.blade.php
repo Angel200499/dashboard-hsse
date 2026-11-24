@@ -21,7 +21,7 @@
     ];
     $esYear      = $selectedYear  ?? null;
     $esMonth     = $selectedMonth ?? null;
-    $esTahunList = range((int) now()->year + 1, 2020);
+    $esTahunList = $tahunList ?? \App\Models\SipekaFinding::getTahunList();
     $esMaxBulan  = $maxBulanSipeka ?? null;
     $esBulanList = ($esMaxBulan && $esYear)
         ? array_filter($esBulanNama, fn($num) => $num <= $esMaxBulan, ARRAY_FILTER_USE_KEY)

@@ -3,6 +3,22 @@
 @section('title', 'Overview')
 
 @section('content')
+@php
+    $bulanNamaList = [
+        1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April',
+        5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus',
+        9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
+    ];
+    $tahunList = $tahunList ?? \App\Models\SipekaFinding::getTahunList();
+
+    // Dropdown bulan khusus Reporting Rate — hanya tampilkan bulan yang
+    // benar-benar memiliki data SIPEKA pada tahun yang dipilih.
+    // $rrMaxBulan dikirim dari controller (null jika tahun belum dipilih atau data tidak ada).
+    $rrBulanList = ($rrMaxBulan ?? null)
+        ? array_filter($bulanNamaList, fn($num) => $num <= $rrMaxBulan, ARRAY_FILTER_USE_KEY)
+        : $bulanNamaList; // fallback: tampilkan semua jika tahun belum dipilih atau tidak ada batas max
+@endphp
+
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -11,13 +27,53 @@
             <p class="text-sm text-slate-500 mt-1">Monitoring dan analitik data temuan PEKA secara real-time.</p>
         </div>
         
-        <!-- Action Buttons -->
-        <div class="flex items-center gap-3">
+        <!-- Filter Utama & Action Buttons -->
+        <div class="flex flex-wrap items-center gap-3">
+            {{-- Filter Utama Tahun Global --}}
+            <form action="" method="GET" onsubmit="return false;" class="flex items-center gap-2" id="dashboard-global-filter-form">
+                @if(request()->has('rr_year'))
+                    <input type="hidden" name="rr_year" value="{{ request('rr_year') }}">
+                @endif
+                @if(request()->has('rr_month'))
+                    <input type="hidden" name="rr_month" value="{{ request('rr_month') }}">
+                @endif
+                @if(request()->has('ko_year'))
+                    <input type="hidden" name="ko_year" value="{{ request('ko_year') }}">
+                @endif
+                @if(request()->has('ko_month'))
+                    <input type="hidden" name="ko_month" value="{{ request('ko_month') }}">
+                @endif
+                @if(request()->has('peka_year'))
+                    <input type="hidden" name="peka_year" value="{{ request('peka_year') }}">
+                @endif
+
+                <select name="year" id="filter-year"
+                    class="bg-white border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-[#9DBF2A] focus:border-[#9DBF2A] block p-2.5 shadow-sm">
+                    <option value="">Semua Tahun</option>
+                    @foreach($tahunList as $yr)
+                        <option value="{{ $yr }}" {{ ($selectedYear ?? null) == $yr ? 'selected' : '' }}>{{ $yr }}</option>
+                    @endforeach
+                </select>
+
+                <div id="dashboard-loading-indicator" class="hidden flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl animate-pulse">
+                    <svg class="animate-spin w-3.5 h-3.5 text-[#9DBF2A]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                    <span>Memuat...</span>
+                </div>
+
+                @if($selectedYear)
+                    @php
+                        $resetGlobalQuery = request()->only(['rr_year', 'rr_month', 'ko_year', 'ko_month', 'peka_year']);
+                    @endphp
+                    <a href="{{ request()->url() }}{{ !empty($resetGlobalQuery) ? '?' . http_build_query($resetGlobalQuery) : '' }}" class="text-xs text-slate-500 hover:text-slate-700 underline whitespace-nowrap">Reset Filter</a>
+                @endif
+            </form>
+
             @if(auth()->user()->isHsseRole())
                 @include('components.executive-summary-btn', [
                     'selectedYear'   => $selectedYear,
                     'selectedMonth'  => $selectedMonth,
                     'maxBulanSipeka' => $maxBulanSipeka,
+                    'tahunList'      => $tahunList ?? null,
                 ])
                 <a href="{{ route('findings.export') }}" class="inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9DBF2A] transition-all shadow-sm">
                     <svg class="w-4 h-4 mr-2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
@@ -36,27 +92,6 @@
 
     </div>
 
-    {{-- ================================================================
-         $bulanNamaList & $tahunList — dipakai oleh filter in-card
-         $rrBulanList  — subset $bulanNamaList untuk Reporting Rate:
-                         dibatasi sampai max bulan SIPEKA aktual tahun ini.
-    ================================================================ --}}
-    @php
-        $bulanNamaList = [
-            1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April',
-            5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus',
-            9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember',
-        ];
-        $tahunList = range(now()->year + 1, 2020);
-
-        // Dropdown bulan khusus Reporting Rate — hanya tampilkan bulan yang
-        // benar-benar memiliki data SIPEKA pada tahun yang dipilih.
-        // $rrMaxBulan dikirim dari controller (null jika tahun belum dipilih atau data tidak ada).
-        $rrBulanList = ($rrMaxBulan ?? null)
-            ? array_filter($bulanNamaList, fn($num) => $num <= $rrMaxBulan, ARRAY_FILTER_USE_KEY)
-            : $bulanNamaList; // fallback: tampilkan semua jika tahun belum dipilih atau tidak ada batas max
-    @endphp
-
     <!-- KPI Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <!-- Card 1: Total Temuan -->
@@ -64,7 +99,7 @@
             <div>
                 <p class="text-sm font-semibold text-slate-500 mb-1">Total Temuan</p>
                 <h3 class="text-3xl font-bold text-slate-800" id="kpi-total">{{ number_format($kpi['total'] ?? 0) }}</h3>
-                <div class="mt-2 text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full w-fit">Keseluruhan Data</div>            </div>
+                <div class="mt-2 text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full w-fit" id="kpi-badge">{{ ($selectedYear ?? null) ? 'Tahun ' . $selectedYear : 'Keseluruhan Data' }}</div>            </div>
             <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
             </div>
@@ -1635,14 +1670,18 @@
         }
     }
 
-    function updateKpi(kpi) {
+    function updateKpi(kpi, selectedYear) {
         if (!kpi) return;
         const totalEl = document.getElementById('kpi-total');
         const openEl = document.getElementById('kpi-open');
         const closedEl = document.getElementById('kpi-closed');
+        const badgeEl = document.getElementById('kpi-badge');
         if (totalEl) totalEl.textContent = Number(kpi.total || 0).toLocaleString('id-ID');
         if (openEl) openEl.textContent = Number(kpi.open || 0).toLocaleString('id-ID');
         if (closedEl) closedEl.textContent = Number(kpi.closed || 0).toLocaleString('id-ID');
+        if (badgeEl && selectedYear !== undefined) {
+            badgeEl.textContent = selectedYear ? ('Tahun ' + selectedYear) : 'Keseluruhan Data';
+        }
     }
 
     function fetchDashboard(params = {}) {
@@ -1680,7 +1719,11 @@
             showDashboardLoading(false);
             if (!data.success) throw new Error(data.message || 'Gagal memuat data');
 
-            updateKpi(data.kpi);
+            updateKpi(data.kpi, data.selectedYear);
+
+            if (data.selectedYear !== undefined && filterYear && String(data.selectedYear) !== filterYear.value) {
+                filterYear.value = data.selectedYear || '';
+            }
 
             if (data.koYear !== undefined && koYearFilter && String(data.koYear) !== koYearFilter.value) {
                 koYearFilter.value = data.koYear || '';
@@ -1733,6 +1776,14 @@
     }
 
     // Attach event listeners
+    const filterYear = document.getElementById('filter-year');
+    if (filterYear) {
+        filterYear.addEventListener('change', function(e) {
+            e.preventDefault();
+            fetchDashboard({ year: this.value });
+        });
+    }
+
     const rrYearFilter = document.getElementById('rr-year-filter');
     if (rrYearFilter) {
         rrYearFilter.onchange = null;
